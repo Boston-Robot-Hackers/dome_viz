@@ -59,7 +59,7 @@
       "**Package manager**: ROS 2 colcon (ament_python); apt for system deps",
       "**Run**: ros2 launch dome_viz <launch file> on the laptop (not yet built)",
       "**Test**: python3 -m pytest src/dome_viz/test from ~/ros2_ws, workspace sourced",
-      "**Source control**: local git only so far; proposed GitHub Boston-Robot-Hackers/dome_viz",
+      "**Source control**: https://github.com/Boston-Robot-Hackers/dome_viz (public)",
       "**Protected branches**: main"
     ],
     "allow": [
