@@ -1,0 +1,69 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)",
+      "Bash(git push:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./credentials.json)",
+      "Read(./**/*.pem)",
+      "Read(./**/id_rsa*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/block-secrets.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/post-edit-ruff.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start-context.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "autoMode": {
+    "environment": [
+      "### Project: dome_viz",
+      "**Purpose**: Read-only, laptop-side web view of the DOME robot's map as it is built (floor plan, semantic targets, robot pose and trail, camera)",
+      "**Package manager**: ROS 2 colcon (ament_python); apt for system deps",
+      "**Run**: ros2 launch dome_viz <launch file> on the laptop (not yet built)",
+      "**Test**: python3 -m pytest src/dome_viz/test from ~/ros2_ws, workspace sourced",
+      "**Source control**: local git only so far; proposed GitHub Boston-Robot-Hackers/dome_viz",
+      "**Protected branches**: main"
+    ],
+    "allow": [
+      "$defaults"
+    ]
+  }
+}

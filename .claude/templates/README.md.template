@@ -1,0 +1,27 @@
+# <APP NAME>
+
+<One sentence description of what the app does.>
+
+## Installation
+
+```bash
+git clone <repo url>
+cd <app name>
+uv sync
+```
+
+## Usage
+
+```bash
+make    # list targets
+```
+
+## Development
+
+```bash
+uv run pytest
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE)
