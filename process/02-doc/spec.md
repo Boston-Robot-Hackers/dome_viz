@@ -38,6 +38,7 @@ Everything is **cleaned up and less detailed than the raw topics** RViz shows.
 | `/map` | `nav_msgs/OccupancyGrid` | slam_toolbox (`dome_nav`) |
 | `/semantic/targets` | `dome_semantic_msgs/SemanticTargetArray` | `dome_semantic` |
 | `/tf`, `/tf_static` (`map → base_footprint`) | `tf2_msgs/TFMessage` | SLAM + `dome2` |
+| `/scan` | `sensor_msgs/LaserScan` | lidar driver (`dome2`); already published, no extra Pi load |
 | `/oak/image_annotated_compressed` | `sensor_msgs/CompressedImage` | `dome_vision` (only while the camera panel is open) |
 
 Display names and abbrevs for objects come from `dome_semantic`'s

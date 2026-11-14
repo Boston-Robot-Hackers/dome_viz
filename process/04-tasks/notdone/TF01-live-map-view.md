@@ -10,7 +10,9 @@ drawing.
 
 ## TF01.0 — Decide the web stack
 
-**Status**: not done
+**Status**: done 2026-11-13 — `aiohttp` (apt) for HTTP + websocket in
+its own asyncio thread; plain JS + canvas in the browser. Why: `notes.md`,
+"Web stack".
 
 **Description**: Pick the websocket/HTTP server library (e.g. `websockets`
 or `aiohttp`) and how it runs beside `rclpy`'s executor (its own thread with
@@ -24,7 +26,14 @@ the choice and why in `process/02-doc/notes.md`.
 
 ## TF01.1 — Layout mockup
 
-**Status**: not done
+**Status**: done 2026-11-13 — approved by the user. Agreed layout in
+`process/02-doc/layout.md`; mockup in `mockup/` (data from the `viz01` drive:
+its last `/map`, real trail and scan, targets from the `viz01replay` bag
+replay). Changes from the plan: walls are **fitted straight segments**
+(`mockup/wall_lines.py`), not cleaned cells; a **coordinate grid** with a
+marked 0, 0; a **laser overlay** (`/scan`, rays and hits); the robot drawn
+from the URDF. No screenshot (built on the robot, no browser); the mockup is
+the reference. Theme left at follow-the-system.
 
 **Description**: A static, clickable mockup of the page, before any page
 code: the real floor plan from `f36run6.pgm`, the real targets from that run
@@ -68,14 +77,22 @@ test loads each module.
 **Description**: `floor_plan.py`: `OccupancyGrid` data (width, height,
 resolution, origin, cells) → a compact grid of three classes, wall / free /
 unknown. Threshold occupancy, then **remove isolated wall specks** (small
-connected blobs) and fill single-cell holes, so the result reads as a floor
-plan. numpy only. Output is what the page draws, plus the map's origin and
+connected blobs) and fill single-cell holes. Then **fit straight wall
+segments** (start from `mockup/wall_lines.py`): the room's main direction,
+greedy lines along it, corners closed, doorways (gaps over 0.3 m) kept open;
+leftover wall cells are clutter. **Keep walls steady between map updates**:
+hold the main direction once found, and keep segment ends unless the map
+under them changed. numpy only. Output: the floor (free/unknown) grid, wall
+segments and clutter cells in `map` metres, plus the map's origin and
 resolution.
 
 *Test*: synthetic grids (a speck is removed, a wall line survives, unknown
 stays unknown), plus a real map loaded from a saved `.pgm` copied into
 `test/fixtures/` (e.g. `f36run6.pgm` + `.yaml`): the cleaned map keeps its
-walls and has fewer isolated wall cells.
+walls and has fewer isolated wall cells. Walls: an L of wall cells gives
+two segments meeting at a corner; a gap over 0.3 m splits a wall; a rotated
+room's segments come out at its angle; refitting an unchanged map gives the
+same segments.
 
 ## TF01.4 — View state (pure)
 
@@ -89,10 +106,19 @@ walls and has fewer isolated wall cells.
   no lost flag, so a target is lost when `last_seen` is older than a
   threshold (default 5 s, `dome_semantic`'s `lost_timeout_s`).
 - **Robot**: position and heading in `map`.
+- **Floor plan**: floor grid, wall segments and clutter from `floor_plan.py`,
+  sent only when `/map` changes.
+- **Laser**: the latest `/scan` as the lidar's position plus its hit points
+  in `map` (through the `laser` frame's TF at the scan's stamp), so the page
+  can draw rays. Downsampled, at most ~5 Hz.
 - **Trail**: append a point only when the robot has moved more than a few
   cm; cap its length.
-- **Status**: per source (map, targets, pose, camera), seconds since the
-  last message, so the page can say "no map yet" or "robot not connected".
+- **Status**: per source (map, targets, pose, laser, camera), seconds since
+  the last message, plus the one overall state the page shows as a sentence:
+  live, waiting for the map, or robot not connected (all robot sources
+  quiet for more than a few seconds).
+- **Targets** also carry **seconds since last seen**, for the list's "2 min
+  ago".
 
 *Test*: label with no profile falls back to the raw label; lost threshold
 at ±1 ms; trail skips sub-threshold moves and drops the oldest past the
@@ -121,6 +147,7 @@ both get the broadcast.
 
 - `/map` with slam_toolbox's QoS (reliable, transient local), so a page
   opened late still gets the current map.
+- `/scan` (sensor-data QoS), for the laser overlay.
 - `/semantic/targets`, and the robot pose from TF `map → base_footprint`
   on a timer (~10 Hz).
 - **Camera**: subscribes to `/oak/image_annotated_compressed` only while

@@ -4,10 +4,23 @@
 
 - **Bootstrapped 2026-11-13** from the j3 kit (`~/j3`, in sync with GitHub).
   No code yet.
-- **Next: F01, live map view.** Its feature file is in
-  `process/03-features/notdone/`, and its task file TF01 (13 steps,
-  TF01.0–TF01.12; TF01.1 is a layout mockup) in `process/04-tasks/notdone/`. **Neither is approved
-  yet**; no code until they are.
+- **F01, live map view: approved 2026-11-13, in progress.** Feature in
+  `process/03-features/notdone/`, task file TF01 (TF01.0–TF01.12) in
+  `process/04-tasks/notdone/`. **TF01.0 done** (aiohttp + plain canvas,
+  `notes.md`). **TF01.1 done**: layout agreed, in `process/02-doc/layout.md`;
+  mockup in `mockup/` (published at
+  https://claude.ai/artifact/H16mhXiNCF5SCbWkBYuQQH). **Next: TF01.2,
+  package skeleton.**
+- **Replay bag for TF01.10 recorded**: `~/bags/viz01` on the robot (446 s,
+  with `/map` and `/oak/image_annotated_compressed`). Not yet copied to the
+  VM. Its targets from a bag replay are in
+  `~/.dome/semantic_maps/viz01replay.json` (the live semantic node started
+  late and missed the can).
+- **Found on the `viz01` drive, for other repos (no issues filed yet)**:
+  `dome_nav`'s slam_manager never saves the map at the end of a run, and a
+  manual `/slam_toolbox/save_map` failed ("Failed to spin map
+  subscription"); `dome_semantic` confirmed 10 false cups, one of them the
+  can read as a cup; the OAK-D crashed on shutdown.
 - **On GitHub**: public repo `Boston-Robot-Hackers/dome_viz`, created
   2026-11-13.
 - **The repo lives in the robot's workspace for now** (`~/ros2_ws/src` on

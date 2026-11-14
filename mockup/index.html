@@ -1,0 +1,777 @@
+<title>DOME Map View</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one screen. Top bar with source status; the floor plan fills the rest;
+   objects and camera float over it (or sit in a right sidebar, per the mockup switch). */
+:root {
+  --unknown: #e6e8e4;      /* unexplored: the page itself */
+  --floor: #fbfbf7;        /* free space */
+  --wall: #28303b;         /* walls, drawn as ink */
+  --surface: #ffffff;      /* panels */
+  --line: #d3d7d0;
+  --fg: #1d232b;
+  --muted: #646d77;
+  --robot: #0b7a83;
+  --grid: rgb(40 48 59 / .10);
+  --axis-x: #3d4652;
+  --axis-y: #3d4652;
+  --clutter: #8b939c;
+  --can: #c2410c;
+  --cup: #6b3fc4;
+  --ok: #2f8f46;
+  --warn: #b7791f;
+  --bad: #c93c3c;
+  --shadow: 0 1px 2px rgb(20 30 40 / .08), 0 6px 20px rgb(20 30 40 / .10);
+  --font-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --unknown: #12161b; --floor: #232a33; --wall: #d9dfe6; --surface: #1a2027;
+    --line: #313a45; --fg: #e8ecf0; --muted: #98a2ad; --robot: #3fc6cf;
+    --grid: rgb(217 223 230 / .10); --axis-x: #c3cbd4; --axis-y: #c3cbd4; --clutter: #6c7784;
+    --can: #f0804a; --cup: #a98bf0; --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --unknown: #12161b; --floor: #232a33; --wall: #d9dfe6; --surface: #1a2027;
+  --line: #313a45; --fg: #e8ecf0; --muted: #98a2ad; --robot: #3fc6cf;
+    --grid: rgb(217 223 230 / .10); --axis-x: #c3cbd4; --axis-y: #c3cbd4; --clutter: #6c7784;
+  --can: #f0804a; --cup: #a98bf0; --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--unknown); color: var(--fg); font-family: var(--font-ui);
+  font-size: 14px; overflow: hidden;
+}
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+
+/* top bar */
+.topbar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line); z-index: 5;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { font-size: 17px; font-weight: 700; letter-spacing: .01em; margin: 0; }
+.brand .mapname { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.status { position: relative; margin-left: auto; }
+.status-line {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px;
+  border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+  color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.status-line:focus-visible { outline: 2px solid var(--robot); outline-offset: 2px; }
+.status-line .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; }
+.status-line .sub { color: var(--muted); }
+.status[data-state="warn"] .dot { background: var(--warn); }
+.status[data-state="bad"] .dot { background: var(--bad); }
+.status[data-state="bad"] .status-line { border-color: color-mix(in srgb, var(--bad) 50%, var(--line)); }
+.status-details {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 8; min-width: 230px;
+  padding: 8px 12px; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; box-shadow: var(--shadow);
+}
+.status-details dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 12px; }
+.status-details dt { color: var(--muted); }
+.status-details dd { margin: 0; font-family: var(--font-data); }
+
+/* main area */
+.main { position: relative; min-height: 0; display: grid; grid-template-columns: 1fr; }
+.app[data-layout="sidebar"] .main { grid-template-columns: 1fr 320px; }
+.stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; touch-action: none; cursor: grab; }
+.stage.dragging { cursor: grabbing; }
+canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.markers { position: absolute; inset: 0; pointer-events: none; }
+
+.marker {
+  position: absolute; transform: translate(-7px, -7px); display: flex; align-items: center;
+  gap: 5px; pointer-events: auto; cursor: pointer; background: none; border: 0; padding: 0;
+  color: var(--fg); font: inherit;
+}
+.marker .pin {
+  width: 14px; height: 14px; border-radius: 50%; background: var(--cls);
+  border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--cls); flex: none;
+}
+.marker .chip {
+  display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px 2px 5px;
+  background: var(--surface); border: 1px solid var(--cls); border-radius: 6px;
+  font-family: var(--font-data); font-size: 11px; font-weight: 500; white-space: nowrap;
+  box-shadow: var(--shadow);
+}
+.marker .chip svg { width: 13px; height: 13px; color: var(--cls); }
+.marker .chip .full { font-family: var(--font-ui); font-weight: 500; }
+.marker[data-lost="true"] .pin { background: var(--surface); box-shadow: 0 0 0 1px var(--cls); border-color: var(--cls); opacity: .7; }
+.marker[data-lost="true"] .chip { border-style: dashed; opacity: .62; box-shadow: none; }
+.marker[data-crowded="true"] .chip { display: none; }
+.marker[data-selected="true"] .pin { box-shadow: 0 0 0 4px color-mix(in srgb, var(--cls) 30%, transparent), 0 0 0 1px var(--cls); }
+.marker[data-selected="true"] .chip { opacity: 1; border-style: solid; }
+.marker:focus-visible { outline: 2px solid var(--robot); outline-offset: 3px; border-radius: 6px; }
+
+/* floating panels */
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.panel h2 {
+  margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--muted);
+}
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px 8px; }
+
+.objects { position: absolute; top: 12px; right: max(12px, env(safe-area-inset-right, 0px)); width: 280px; max-height: calc(100% - 24px); display: flex; flex-direction: column; z-index: 3; }
+.objects-body { overflow-y: auto; padding: 0 6px 8px; }
+.group-label { font-size: 11px; color: var(--muted); padding: 8px 6px 4px; }
+.obj {
+  display: grid; grid-template-columns: 20px 52px 1fr auto; align-items: center; gap: 8px;
+  width: 100%; padding: 6px; border: 0; border-radius: 7px; background: none; color: var(--fg);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.obj:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.obj:focus-visible { outline: 2px solid var(--robot); outline-offset: -2px; }
+.obj[aria-pressed="true"] { background: color-mix(in srgb, var(--cls) 14%, transparent); }
+.obj svg { width: 18px; height: 18px; color: var(--cls); }
+.obj .id { font-family: var(--font-data); font-size: 12px; font-weight: 500; }
+.obj .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.obj .when { font-family: var(--font-data); font-size: 11px; color: var(--muted); }
+.obj[data-lost="true"] .id, .obj[data-lost="true"] .name { opacity: .6; }
+
+.detail { margin: 4px 6px 8px; padding: 10px 12px; border-radius: 8px; background: color-mix(in srgb, var(--cls) 10%, transparent); }
+.detail .title { font-weight: 600; font-size: 15px; display: flex; gap: 8px; align-items: baseline; }
+.detail .title .id { font-family: var(--font-data); font-size: 12px; color: var(--muted); }
+.detail dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0 0; font-size: 12px; }
+.detail dt { color: var(--muted); }
+.detail dd { margin: 0; font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+
+.camera { position: absolute; right: max(12px, env(safe-area-inset-right, 0px)); bottom: 12px; width: 320px; z-index: 3; overflow: hidden; }
+.camera-body { padding: 0 12px 12px; }
+.camera canvas { width: 100%; aspect-ratio: 4 / 3; display: block; border-radius: 6px; background: #000; max-width: 100%; }
+.camera .off { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; }
+.switch input { appearance: none; width: 32px; height: 18px; border-radius: 9px; background: var(--line); position: relative; cursor: pointer; margin: 0; transition: background .15s; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--surface); transition: transform .15s; box-shadow: 0 1px 2px rgb(0 0 0 / .3); }
+.switch input:checked { background: var(--robot); }
+.switch input:checked::after { transform: translateX(14px); }
+.switch input:focus-visible { outline: 2px solid var(--robot); outline-offset: 2px; }
+
+/* sidebar layout */
+.sidebar { display: none; border-left: 1px solid var(--line); background: var(--surface); min-height: 0; overflow-y: auto; flex-direction: column; }
+.app[data-layout="sidebar"] .sidebar { display: flex; }
+.sidebar .panel { position: static; width: auto; max-height: none; box-shadow: none; border: 0; border-radius: 0; border-bottom: 1px solid var(--line); }
+
+/* map controls */
+.controls { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: 12px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; z-index: 3; }
+.btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--fg);
+  font: inherit; font-size: 13px; cursor: pointer; box-shadow: var(--shadow);
+}
+.btn.square { width: 32px; padding: 0; justify-content: center; font-size: 17px; }
+.btn[aria-pressed="true"] { background: var(--robot); color: var(--surface); border-color: var(--robot); }
+.btn:focus-visible { outline: 2px solid var(--robot); outline-offset: 2px; }
+.scalebar { font-family: var(--font-data); font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.scalebar .bar { height: 6px; border: 1.5px solid var(--fg); border-top: 0; opacity: .7; }
+
+/* banners and empty state */
+.banner {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 4;
+  display: flex; gap: 10px; align-items: center; padding: 9px 14px; max-width: calc(100% - 32px);
+  background: var(--surface); border: 1px solid var(--bad); border-radius: 9px; box-shadow: var(--shadow);
+}
+.banner .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); flex: none; }
+.banner strong { font-weight: 600; }
+.banner span { color: var(--muted); }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; z-index: 2; padding: 24px; }
+.empty h3 { font-size: 18px; margin: 0 0 6px; font-weight: 600; }
+.empty p { margin: 0; color: var(--muted); max-width: 36ch; line-height: 1.5; }
+.spinner { width: 26px; height: 26px; margin: 0 auto 14px; border: 3px solid var(--line); border-top-color: var(--robot); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } .switch input, .switch input::after { transition: none; } }
+
+/* mockup-only switcher */
+.mock {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 6;
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: center;
+  padding: 8px 12px; max-width: calc(100% - 24px);
+  background: var(--surface); border: 1.5px dashed var(--muted); border-radius: 10px; font-size: 12px;
+}
+.mock .tag { font-weight: 700; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.mock label { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); }
+.mock select { font: inherit; font-size: 12px; padding: 3px 4px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+.app[data-layout="sidebar"] .mock { left: calc(50% - 160px); }
+
+@media (max-width: 760px) {
+  .app[data-layout="sidebar"] .main { grid-template-columns: 1fr; }
+  .app[data-layout="sidebar"] .sidebar { display: none; }
+  .app[data-layout="sidebar"] .mock { left: 50%; }
+  .objects { width: min(260px, calc(100% - 24px)); max-height: 45%; }
+  .camera { width: min(240px, calc(100% - 24px)); bottom: 64px; }
+  .controls { bottom: 64px; }
+  .mock { gap: 8px; }
+  .status-line .sub { display: none; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ic-can" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="5.5" ry="2"/><path d="M6.5 5v14c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V5"/><path d="M6.5 9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/></g></symbol>
+  <symbol id="ic-cup" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 7h11l-1.2 11.2A2 2 0 0 1 12.8 20H8.2a2 2 0 0 1-2-1.8L5 7z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H15.4"/><path d="M8.5 3.5c0 1 1 1 1 2M12 3.5c0 1 1 1 1 2"/></g></symbol>
+  <symbol id="ic-obj" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+</svg>
+
+<div class="app" id="app" data-layout="sidebar">
+  <header class="topbar">
+    <div class="brand"><h1>DOME Map</h1><span class="mapname" id="mapname">map f36run6</span></div>
+    <div class="status" id="status">
+      <button class="status-line" id="statusLine" aria-expanded="false" aria-controls="statusDetails"></button>
+      <div class="status-details" id="statusDetails" hidden></div>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="map" aria-label="Floor plan of the area the robot has mapped"></canvas>
+      <div class="markers" id="markers"></div>
+      <div class="empty" id="empty" hidden>
+        <div><div class="spinner"></div><h3>Waiting for the map</h3><p>No map has arrived yet. Start SLAM on the robot, or play a bag with <code>--clock</code>.</p></div>
+      </div>
+      <div class="banner" id="banner" hidden role="status"><span class="dot"></span><strong>Robot not connected.</strong><span>Showing the last map, from 2 min ago.</span></div>
+
+      <section class="panel objects" id="objectsFloat" aria-label="Objects found"></section>
+      <section class="panel camera" id="cameraFloat" aria-label="Camera"></section>
+
+      <div class="controls">
+        <div class="scalebar" id="scalebar"><div class="bar" id="scalebarBar"></div><span id="scalebarLabel">1 m</span></div>
+        <div class="btnrow">
+          <button class="btn square" id="zoomIn" aria-label="Zoom in">+</button>
+          <button class="btn square" id="zoomOut" aria-label="Zoom out">−</button>
+          <button class="btn" id="fit">Fit map</button>
+          <button class="btn" id="follow" aria-pressed="false">Follow robot</button>
+          <button class="btn" id="scanBtn" aria-pressed="true" title="Show what the laser sees right now">Laser</button>
+        </div>
+      </div>
+    </div>
+    <aside class="sidebar" id="sidebar"></aside>
+
+    <div class="mock" role="group" aria-label="Mockup options">
+      <span class="tag">Mockup</span>
+      <label for="optLayout">Layout <select id="optLayout"><option value="sidebar">Sidebar</option><option value="floating">Floating panels</option></select></label>
+      <label for="optCamera">Camera <select id="optCamera"><option value="sidebar">In sidebar</option><option value="corner">Corner</option></select></label>
+      <label for="optSituation">Situation <select id="optSituation"><option value="live">Live</option><option value="offline">Robot not connected</option><option value="nomap">No map yet</option></select></label>
+      <label for="optTheme">Theme <select id="optTheme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script>
+(() => {
+  const D = window.MOCKUP_DATA;
+  const app = document.getElementById("app");
+  const stage = document.getElementById("stage");
+  const canvas = document.getElementById("map");
+  const ctx = canvas.getContext("2d");
+  const markersEl = document.getElementById("markers");
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+  const state = {
+    layout: "sidebar", cameraPlace: "sidebar", situation: "live", statusOpen: false,
+    cameraOn: false, follow: false, selected: null, showScan: true,
+    scale: 80, cx: 0, cy: 0,   // px per metre, view centre in map metres
+  };
+  const robot = D.trail[D.trail.length - 1];
+  const CLASS_VAR = { can: "--can", cup: "--cup" };
+  const ICON = { can: "#ic-can", cup: "#ic-cup" };
+
+  // ---- floor plan, rendered once to an offscreen canvas ----
+  // Smoothing: blur the floor and wall masks a little, then resample them at
+  // PX pixels per cell with bilinear interpolation and a soft threshold. Edges
+  // come out rounded and anti-aliased, small holes close, wall dots join up.
+  const PX = 8; // offscreen pixels per cell
+  // edge: half-width of the soft edge, in mask units (smaller is crisper)
+  const SMOOTH = {
+    floor: { passes: 3, threshold: 0.42, edge: 0.05 },
+  };
+  let plan = null, planTheme = "";
+
+  function boxBlur(src, w, h, passes) {
+    let a = Float32Array.from(src), b = new Float32Array(w * h);
+    for (let p = 0; p < passes; p++) {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        b[i] = (a[i] + (x > 0 ? a[i - 1] : 0) + (x < w - 1 ? a[i + 1] : 0)) / 3;
+      }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const i = y * w + x;
+        a[i] = (b[i] + (y > 0 ? b[i - w] : 0) + (y < h - 1 ? b[i + w] : 0)) / 3;
+      }
+    }
+    return a;
+  }
+
+  function maskLayer(field, w, h, { threshold, edge }, color) {
+    const W = w * PX, H = h * PX;
+    const layer = document.createElement("canvas");
+    layer.width = W; layer.height = H;
+    const lc = layer.getContext("2d");
+    const img = lc.createImageData(W, H), px = img.data;
+    const lo = threshold - edge, span = 2 * edge;
+    for (let oy = 0; oy < H; oy++) {
+      const fy = Math.min(h - 1, Math.max(0, (oy + .5) / PX - .5));
+      const y0 = Math.floor(fy), y1 = Math.min(h - 1, y0 + 1), ty = fy - y0;
+      for (let ox = 0; ox < W; ox++) {
+        const fx = Math.min(w - 1, Math.max(0, (ox + .5) / PX - .5));
+        const x0 = Math.floor(fx), x1 = Math.min(w - 1, x0 + 1), tx = fx - x0;
+        const top = field[y0 * w + x0] * (1 - tx) + field[y0 * w + x1] * tx;
+        const bot = field[y1 * w + x0] * (1 - tx) + field[y1 * w + x1] * tx;
+        let t = ((top * (1 - ty) + bot * ty) - lo) / span;
+        t = t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
+        px[(oy * W + ox) * 4 + 3] = 255 * t;
+      }
+    }
+    lc.putImageData(img, 0, 0);
+    lc.globalCompositeOperation = "source-in";
+    lc.fillStyle = color; lc.fillRect(0, 0, W, H);
+    return layer;
+  }
+
+  function buildPlan() {
+    const w = D.width, h = D.height, n = w * h;
+    const known = new Float32Array(n);
+    for (let i = 0; i < n; i++) known[i] = D.cells[i] !== "0" ? 1 : 0;
+    const off = document.createElement("canvas");
+    off.width = w * PX; off.height = h * PX;
+    const o = off.getContext("2d");
+    o.drawImage(maskLayer(boxBlur(known, w, h, SMOOTH.floor.passes), w, h, SMOOTH.floor, css("--floor")), 0, 0);
+    plan = off; planTheme = themeKey();
+  }
+  const themeKey = () => css("--floor") + css("--wall");
+
+  // ---- view transform ----
+  const toScreen = (x, y) => [stage.clientWidth / 2 + (x - state.cx) * state.scale,
+                              stage.clientHeight / 2 - (y - state.cy) * state.scale];
+  const toWorld = (sx, sy) => [state.cx + (sx - stage.clientWidth / 2) / state.scale,
+                               state.cy - (sy - stage.clientHeight / 2) / state.scale];
+  function fit() {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let r = 0; r < D.height; r++) for (let c = 0; c < D.width; c++) {
+      if (D.cells[r * D.width + c] === "0") continue;
+      const x = D.origin[0] + c * D.resolution, y = D.origin[1] + (D.height - 1 - r) * D.resolution;
+      minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+    }
+    const w = stage.clientWidth, h = stage.clientHeight;
+    const reserveRight = state.layout === "floating" && w > 760 ? 300 : 0;
+    state.scale = Math.min((w - reserveRight - 80) / (maxX - minX), (h - 120) / (maxY - minY));
+    state.cx = (minX + maxX) / 2 + reserveRight / 2 / state.scale;
+    state.cy = (minY + maxY) / 2 - 20 / state.scale;
+    setFollow(false);
+  }
+
+  // ---- drawing ----
+  function draw() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = stage.clientWidth, h = stage.clientHeight;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    }
+    if (!plan || planTheme !== themeKey()) buildPlan();
+    if (state.follow) { state.cx = robot[0]; state.cy = robot[1]; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const noMap = state.situation === "nomap";
+    document.getElementById("empty").hidden = !noMap;
+    if (!noMap) {
+      const [left, top] = toScreen(D.origin[0], D.origin[1] + D.height * D.resolution);
+      const size = D.resolution * state.scale;
+      ctx.imageSmoothingEnabled = true;
+      ctx.globalAlpha = state.situation === "offline" ? .55 : 1;
+      ctx.drawImage(plan, left, top, D.width * size, D.height * size);
+      ctx.globalAlpha = 1;
+      drawGrid(); drawWalls(); drawOrigin(); drawScan(); drawTrail(); drawRobot();
+    }
+    drawScale();
+    placeMarkers(noMap);
+  }
+
+  // ---- coordinate grid, map frame ----
+  function gridStep() {
+    const steps = [0.5, 1, 2, 5, 10];
+    return steps.find((s) => s * state.scale >= 46) ?? 10;
+  }
+  function drawGrid() {
+    const w = stage.clientWidth, h = stage.clientHeight, step = gridStep();
+    const [x0, y1] = toWorld(0, 0), [x1, y0] = toWorld(w, h);
+    ctx.lineWidth = 1; ctx.strokeStyle = css("--grid");
+    ctx.beginPath();
+    for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) {
+      const sx = Math.round(toScreen(x, 0)[0]) + .5; ctx.moveTo(sx, 0); ctx.lineTo(sx, h);
+    }
+    for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) {
+      const sy = Math.round(toScreen(0, y)[1]) + .5; ctx.moveTo(0, sy); ctx.lineTo(w, sy);
+    }
+    ctx.stroke();
+    // metre labels along the top and left edges
+    ctx.fillStyle = css("--muted"); ctx.font = "500 10px IBM Plex Mono, monospace";
+    const fmt = (v) => `${Number(v.toFixed(1))}`;
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) {
+      if (Math.abs(x) < 1e-9) continue;
+      ctx.fillText(fmt(x), toScreen(x, 0)[0], 4);
+    }
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) {
+      if (Math.abs(y) < 1e-9) continue;
+      ctx.fillText(fmt(y), 4, toScreen(0, y)[1]);
+    }
+    // the two axes, full length
+    const [ox, oy] = toScreen(0, 0);
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = css("--axis-x"); ctx.globalAlpha = .55;
+    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(w, oy); ctx.stroke();
+    ctx.strokeStyle = css("--axis-y");
+    ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, h); ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+  function drawOrigin() {
+    const [ox, oy] = toScreen(0, 0), len = 34;
+    const arrow = (dx, dy, color, label) => {
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(ox + dx * len, oy + dy * len); ctx.stroke();
+      const tx = ox + dx * (len + 2), ty = oy + dy * (len + 2);
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(tx - dx * 8 - dy * 4.5, ty - dy * 8 + dx * 4.5);
+      ctx.lineTo(tx - dx * 8 + dy * 4.5, ty - dy * 8 - dx * 4.5);
+      ctx.closePath(); ctx.fill();
+      ctx.font = "600 11px IBM Plex Mono, monospace"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(label, ox + dx * (len + 14), oy + dy * (len + 14));
+    };
+    arrow(1, 0, css("--axis-x"), "x");
+    arrow(0, -1, css("--axis-y"), "y");
+    ctx.fillStyle = css("--surface"); ctx.strokeStyle = css("--fg"); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(ox, oy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.font = "600 11px IBM Plex Mono, monospace"; ctx.fillStyle = css("--fg");
+    ctx.textAlign = "right"; ctx.textBaseline = "top";
+    ctx.fillText("0, 0", ox - 8, oy + 7);
+  }
+
+  // ---- walls as straight strokes, leftovers as small marks ----
+  function drawWalls() {
+    const dim = state.situation === "offline";
+    ctx.globalAlpha = dim ? .55 : 1;
+    ctx.fillStyle = css("--clutter");
+    const dot = Math.max(1.5, D.resolution * state.scale * .5);
+    for (const [x, y] of D.clutter) {
+      const [sx, sy] = toScreen(x, y);
+      ctx.fillRect(sx - dot / 2, sy - dot / 2, dot, dot);
+    }
+    ctx.strokeStyle = css("--wall"); ctx.lineCap = "round";
+    ctx.lineWidth = Math.max(2.5, .07 * state.scale);
+    ctx.beginPath();
+    for (const [x1, y1, x2, y2] of D.walls) {
+      const [a, b] = toScreen(x1, y1), [c, d] = toScreen(x2, y2);
+      ctx.moveTo(a, b); ctx.lineTo(c, d);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- latest laser scan: what the robot sees right now, ahead of /map ----
+  function drawScan() {
+    if (!state.showScan || state.situation === "offline" || !D.scan?.points.length) return;
+    const color = css("--robot");
+    const [lx, ly] = toScreen(D.scan.origin[0], D.scan.origin[1]);
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = .13;
+    ctx.beginPath();
+    for (const [x, y] of D.scan.points) {
+      const [sx, sy] = toScreen(x, y);
+      ctx.moveTo(lx, ly); ctx.lineTo(sx, sy);
+    }
+    ctx.stroke();
+    ctx.fillStyle = color; ctx.globalAlpha = .6;
+    const r = Math.max(1.6, .02 * state.scale);
+    ctx.beginPath();
+    for (const [x, y] of D.scan.points) {
+      const [sx, sy] = toScreen(x, y);
+      ctx.moveTo(sx + r, sy); ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    }
+    ctx.fill(); ctx.globalAlpha = 1;
+  }
+
+  function drawTrail() {
+    const color = css("--robot");
+    ctx.lineWidth = Math.max(2, .05 * state.scale); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.strokeStyle = color;
+    const n = D.trail.length;
+    for (let i = 1; i < n; i++) {
+      ctx.globalAlpha = .12 + .45 * (i / n);
+      const [x0, y0] = toScreen(D.trail[i - 1][0], D.trail[i - 1][1]);
+      const [x1, y1] = toScreen(D.trail[i][0], D.trail[i][1]);
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function drawRobot() {
+    // Top view of DOME from dome2's URDF, in metres in base_footprint (x
+    // forward, y left): 0.30 m round plate, drive wheels at x 0.10 y ±0.125
+    // (0.07 m diameter), caster at x -0.12, lidar at x -0.08, camera bar at
+    // the front. Drawn to scale, but never smaller than ~30 px across.
+    const [sx, sy] = toScreen(robot[0], robot[1]);
+    const s = Math.max(state.scale, 30 / 0.30); // px per metre for the robot
+    const offline = state.situation === "offline";
+    const accent = offline ? css("--muted") : css("--robot");
+    const ink = css("--wall"), surface = css("--surface");
+    const rrect = (cx, cy, len, wid, rad) => {
+      ctx.beginPath(); ctx.roundRect((cx - len / 2) * s, (-cy - wid / 2) * s, len * s, wid * s, rad * s);
+    };
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate(-robot[2]);
+    if (!offline) { // soft halo
+      ctx.fillStyle = accent; ctx.globalAlpha = .14;
+      ctx.beginPath(); ctx.arc(0, 0, .25 * s, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+    }
+    // wheels sit under the plate's edge, so draw them first
+    ctx.fillStyle = ink;
+    for (const side of [1, -1]) { rrect(.10, side * .128, .075, .028, .008); ctx.fill(); }
+    // plate
+    ctx.fillStyle = surface; ctx.strokeStyle = accent; ctx.lineWidth = Math.max(2, .012 * s);
+    ctx.beginPath(); ctx.arc(0, 0, .15 * s, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    // caster
+    ctx.strokeStyle = ink; ctx.lineWidth = Math.max(1, .006 * s);
+    ctx.beginPath(); ctx.arc(-.12 * s, 0, .014 * s, 0, Math.PI * 2); ctx.stroke();
+    // lidar puck
+    ctx.fillStyle = ink;
+    ctx.beginPath(); ctx.arc(-.08 * s, 0, .036 * s, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(-.08 * s, 0, .013 * s, 0, Math.PI * 2); ctx.fill();
+    // camera bar at the front, with its lens
+    ctx.fillStyle = ink; rrect(.125, 0, .022, .09, .004); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(.137 * s, 0, .008 * s, 0, Math.PI * 2); ctx.fill();
+    // heading chevron between lidar and camera
+    ctx.strokeStyle = accent; ctx.lineWidth = Math.max(2, .014 * s); ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath(); ctx.moveTo(.0 * s, -.035 * s); ctx.lineTo(.065 * s, 0); ctx.lineTo(.0 * s, .035 * s); ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawScale() {
+    const target = 110, nice = [0.25, 0.5, 1, 2, 5, 10];
+    const metres = nice.find((m) => m * state.scale >= target * .6) ?? 10;
+    document.getElementById("scalebarBar").style.width = `${metres * state.scale}px`;
+    document.getElementById("scalebarLabel").textContent = metres < 1 ? `${metres * 100} cm` : `${metres} m`;
+  }
+
+  // ---- object markers (DOM, so text stays crisp and clickable) ----
+  const ago = (s) => s <= 5 ? "in view" : s < 60 ? `${Math.round(s)} s ago` : `${Math.round(s / 60)} min ago`;
+  const icon = (label) => `<svg aria-hidden="true"><use href="${ICON[label] ?? "#ic-obj"}"/></svg>`;
+  const priority = (t) => (t.id === state.selected ? 1e9 : 0) + (t.is_lost ? 0 : 1e6) + t.observation_count;
+  const markerEls = new Map();
+  for (const t of D.targets) {
+    const el = document.createElement("button");
+    el.className = "marker"; el.dataset.lost = t.is_lost;
+    el.style.setProperty("--cls", `var(${CLASS_VAR[t.label] ?? "--muted"})`);
+    el.setAttribute("aria-label", `${t.display_name} ${t.badge}, ${ago(t.seen_ago_s)}`);
+    el.innerHTML = `<span class="pin"></span><span class="chip">${icon(t.label)}<span class="b">${t.badge}</span></span>`;
+    el.addEventListener("click", (e) => { e.stopPropagation(); select(t.id, true); });
+    markersEl.appendChild(el); markerEls.set(t.id, el);
+  }
+  function placeMarkers(hidden) {
+    markersEl.hidden = hidden;
+    if (hidden) return;
+    const placed = [];
+    for (const t of [...D.targets].sort((a, b) => priority(b) - priority(a))) {
+      const el = markerEls.get(t.id);
+      const [sx, sy] = toScreen(t.x, t.y);
+      el.style.left = `${sx}px`; el.style.top = `${sy}px`;
+      const sel = t.id === state.selected;
+      el.dataset.selected = sel;
+      el.querySelector(".b").innerHTML = sel ? `${t.badge} · <span class="full">${t.display_name}</span>` : t.badge;
+      el.dataset.crowded = "false";
+      const box = { x: sx, y: sy - 11, w: el.offsetWidth, h: 22 };
+      const hit = placed.some((p) => box.x < p.x + p.w && box.x + box.w > p.x && box.y < p.y + p.h && box.y + box.h > p.y);
+      if (hit && !sel) el.dataset.crowded = "true"; else placed.push(box);
+    }
+  }
+
+  // ---- panels ----
+  function objectsHTML() {
+    const live = D.targets.filter((t) => !t.is_lost).sort((a, b) => b.observation_count - a.observation_count);
+    const lost = D.targets.filter((t) => t.is_lost).sort((a, b) => a.seen_ago_s - b.seen_ago_s);
+    const row = (t) => `<button class="obj" data-id="${t.id}" data-lost="${t.is_lost}" aria-pressed="${t.id === state.selected}" style="--cls: var(${CLASS_VAR[t.label] ?? "--muted"})">${icon(t.label)}<span class="id">${t.badge}</span><span class="name">${t.display_name}</span><span class="when">${ago(t.seen_ago_s)}</span></button>`;
+    const sel = D.targets.find((t) => t.id === state.selected);
+    const detail = sel ? `<div class="detail" style="--cls: var(${CLASS_VAR[sel.label] ?? "--muted"})"><div class="title">${sel.display_name}<span class="id">${sel.badge}</span></div><dl><dt>Status</dt><dd>${sel.is_lost ? "out of view" : "in view"}</dd><dt>Last seen</dt><dd>${ago(sel.seen_ago_s)}</dd><dt>Position</dt><dd>${sel.x.toFixed(2)}, ${sel.y.toFixed(2)} m</dd><dt>Sightings</dt><dd>${sel.observation_count.toLocaleString()}</dd></dl></div>` : "";
+    return `<div class="panel-head"><h2>Objects · ${D.targets.length}</h2></div><div class="objects-body">${detail}<div class="group-label">In view now</div>${live.map(row).join("") || '<div class="group-label">None</div>'}<div class="group-label">Seen earlier</div>${lost.map(row).join("")}</div>`;
+  }
+  function cameraHTML() {
+    const on = state.cameraOn;
+    return `<div class="panel-head"><h2>Camera</h2><label class="switch" for="camToggle"><input type="checkbox" id="camToggle" ${on ? "checked" : ""}>${on ? "On" : "Off"}</label></div><div class="camera-body">${on ? '<canvas id="camCanvas" width="640" height="480" aria-label="Camera view (placeholder image)"></canvas>' : '<p class="off">The camera is off. Turning it on makes the robot send its video, which adds load on the robot.</p>'}</div>`;
+  }
+  function renderPanels() {
+    const side = state.layout === "sidebar" && stage.clientWidth > 0 && window.innerWidth > 760;
+    const objF = document.getElementById("objectsFloat"), camF = document.getElementById("cameraFloat");
+    const sidebar = document.getElementById("sidebar");
+    const camInSide = side && state.cameraPlace === "sidebar";
+    sidebar.innerHTML = side ? `${camInSide ? `<section class="panel camera-side" aria-label="Camera">${cameraHTML()}</section>` : ""}<section class="panel" aria-label="Objects found">${objectsHTML()}</section>` : "";
+    objF.hidden = side; objF.innerHTML = side ? "" : objectsHTML();
+    camF.hidden = camInSide; camF.innerHTML = camInSide ? "" : cameraHTML();
+    if (camInSide) sidebar.querySelector(".camera-side .camera-body").style.padding = "0 12px 12px";
+    document.querySelectorAll(".obj").forEach((b) => b.addEventListener("click", () => select(b.dataset.id, true)));
+    const toggle = document.getElementById("camToggle");
+    toggle.addEventListener("change", () => { state.cameraOn = toggle.checked; renderPanels(); renderSources(); });
+    if (state.cameraOn) drawCamera(document.getElementById("camCanvas"));
+  }
+
+  function drawCamera(cv) {
+    // Placeholder for /oak/image_annotated_compressed: a simple drawn scene.
+    const c = cv.getContext("2d"), W = cv.width, H = cv.height;
+    const g = c.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, "#c9c3b8"); g.addColorStop(.55, "#b4ab9c"); g.addColorStop(.56, "#8c7f6c"); g.addColorStop(1, "#6f6455");
+    c.fillStyle = g; c.fillRect(0, 0, W, H);
+    c.fillStyle = "#a8341a"; c.fillRect(300, 250, 44, 82);
+    c.fillStyle = "#d9d9d9"; c.fillRect(300, 250, 44, 8);
+    c.strokeStyle = "#39d353"; c.lineWidth = 3; c.strokeRect(290, 240, 64, 102);
+    c.fillStyle = "#39d353"; c.fillRect(290, 214, 132, 26);
+    c.fillStyle = "#06210d"; c.font = "500 17px IBM Plex Mono, monospace"; c.fillText("can 0.91 CN1", 296, 233);
+    c.fillStyle = "rgba(0,0,0,.55)"; c.fillRect(0, H - 30, W, 30);
+    c.fillStyle = "#fff"; c.font = "14px IBM Plex Mono, monospace"; c.fillText("Placeholder image (mockup)", 12, H - 10);
+  }
+
+  // ---- top bar status ----
+  function renderSources() {
+    // One plain sentence; the per-source detail is one click away.
+    const s = state.situation;
+    const camera = state.cameraOn ? (s === "offline" ? "2 min ago" : "live") : "off";
+    const view = {
+      live: { state: "ok", text: "Live", sub: "map updated 1 s ago",
+              rows: [["Map", "1 s ago"], ["Robot", "live"], ["Objects", "live"], ["Laser", "live"]] },
+      offline: { state: "bad", text: "Robot not connected", sub: "last heard 2 min ago",
+                 rows: [["Map", "2 min ago"], ["Robot", "2 min ago"], ["Objects", "2 min ago"], ["Laser", "2 min ago"]] },
+      nomap: { state: "warn", text: "Waiting for the map", sub: "robot connected",
+               rows: [["Map", "none yet"], ["Robot", "live"], ["Objects", "live"], ["Laser", "live"]] },
+    }[s];
+    const status = document.getElementById("status");
+    status.dataset.state = view.state;
+    const line = document.getElementById("statusLine");
+    line.innerHTML = `<span class="dot"></span><span>${view.text}</span><span class="sub">· ${view.sub}</span>`;
+    line.setAttribute("aria-expanded", state.statusOpen);
+    const details = document.getElementById("statusDetails");
+    details.hidden = !state.statusOpen;
+    details.innerHTML = `<dl>${[...view.rows, ["Camera", camera]].map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+    document.getElementById("banner").hidden = s !== "offline";
+  }
+  document.getElementById("statusLine").addEventListener("click", (e) => {
+    e.stopPropagation(); state.statusOpen = !state.statusOpen; renderSources();
+  });
+  document.addEventListener("click", (e) => {
+    if (state.statusOpen && !e.target.closest(".status")) { state.statusOpen = false; renderSources(); }
+  });
+
+
+  function select(id, centre) {
+    state.selected = state.selected === id ? null : id;
+    const t = D.targets.find((x) => x.id === state.selected);
+    renderPanels(); draw();
+    if (t && centre) bringIntoView(t);
+  }
+
+  // Pan only if the target is off-screen or under a panel; never change zoom.
+  function visibleRect() {
+    const w = stage.clientWidth, h = stage.clientHeight, pad = 48;
+    let right = w - pad;
+    const objF = document.getElementById("objectsFloat"), camF = document.getElementById("cameraFloat");
+    for (const el of [objF, camF]) {
+      if (el.hidden || !el.offsetWidth) continue;
+      right = Math.min(right, el.offsetLeft - pad);
+    }
+    return { left: pad, top: pad, right: Math.max(pad * 2, right), bottom: h - 90 };
+  }
+  let panAnim = null;
+  function bringIntoView(t) {
+    const r = visibleRect();
+    const [sx, sy] = toScreen(t.x, t.y);
+    const dx = sx < r.left ? sx - r.left : sx > r.right ? sx - r.right : 0;
+    const dy = sy < r.top ? sy - r.top : sy > r.bottom ? sy - r.bottom : 0;
+    if (!dx && !dy) return;
+    setFollow(false);
+    const from = [state.cx, state.cy];
+    const to = [state.cx + dx / state.scale, state.cy - dy / state.scale];
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      [state.cx, state.cy] = to; draw(); return;
+    }
+    const start = performance.now(), ms = 350;
+    cancelAnimationFrame(panAnim);
+    const step = (now) => {
+      const k = Math.min(1, (now - start) / ms), e = 1 - Math.pow(1 - k, 3);
+      state.cx = from[0] + (to[0] - from[0]) * e; state.cy = from[1] + (to[1] - from[1]) * e;
+      draw();
+      if (k < 1) panAnim = requestAnimationFrame(step);
+    };
+    panAnim = requestAnimationFrame(step);
+  }
+  function setFollow(on) { state.follow = on; document.getElementById("follow").setAttribute("aria-pressed", on); }
+
+  // ---- pan / zoom / pinch ----
+  const pointers = new Map(); let pinchStart = null;
+  stage.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".panel, .controls, .marker, .mock")) return;
+    stage.setPointerCapture(e.pointerId); pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    stage.classList.add("dragging");
+    if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchStart = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), scale: state.scale }; }
+  });
+  stage.addEventListener("pointermove", (e) => {
+    if (!pointers.has(e.pointerId)) return;
+    const prev = pointers.get(e.pointerId); pointers.set(e.pointerId, [e.clientX, e.clientY]);
+    if (pointers.size === 2 && pinchStart) {
+      const [a, b] = [...pointers.values()];
+      state.scale = clampScale(pinchStart.scale * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinchStart.d);
+    } else {
+      setFollow(false);
+      state.cx -= (e.clientX - prev[0]) / state.scale; state.cy += (e.clientY - prev[1]) / state.scale;
+    }
+    draw();
+  });
+  const endPointer = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2) pinchStart = null; if (!pointers.size) stage.classList.remove("dragging"); };
+  stage.addEventListener("pointerup", endPointer); stage.addEventListener("pointercancel", endPointer);
+  stage.addEventListener("click", (e) => { if (!e.target.closest(".panel, .controls, .marker, .mock") && state.selected) select(state.selected, false); });
+  const clampScale = (s) => Math.min(600, Math.max(15, s));
+  function zoomAt(factor, sx, sy) {
+    const [wx, wy] = toWorld(sx, sy);
+    state.scale = clampScale(state.scale * factor);
+    if (!state.follow) { state.cx = wx - (sx - stage.clientWidth / 2) / state.scale; state.cy = wy + (sy - stage.clientHeight / 2) / state.scale; }
+    draw();
+  }
+  stage.addEventListener("wheel", (e) => {
+    if (e.target.closest(".panel, .mock")) return;
+    e.preventDefault(); const rect = stage.getBoundingClientRect();
+    zoomAt(Math.exp(-e.deltaY * .0015), e.clientX - rect.left, e.clientY - rect.top);
+  }, { passive: false });
+  document.getElementById("zoomIn").onclick = () => zoomAt(1.3, stage.clientWidth / 2, stage.clientHeight / 2);
+  document.getElementById("zoomOut").onclick = () => zoomAt(1 / 1.3, stage.clientWidth / 2, stage.clientHeight / 2);
+  document.getElementById("fit").onclick = () => { fit(); draw(); };
+  document.getElementById("follow").onclick = () => { setFollow(!state.follow); draw(); };
+  document.getElementById("scanBtn").onclick = (e) => {
+    state.showScan = !state.showScan; e.currentTarget.setAttribute("aria-pressed", state.showScan); draw();
+  };
+
+  // ---- mockup switcher ----
+  const bind = (id, fn) => document.getElementById(id).addEventListener("change", (e) => fn(e.target.value));
+  bind("optLayout", (v) => { state.layout = v; app.dataset.layout = v; requestAnimationFrame(() => { renderPanels(); fit(); draw(); }); });
+  bind("optCamera", (v) => { state.cameraPlace = v; if (v === "sidebar" && state.layout !== "sidebar") { document.getElementById("optLayout").value = "sidebar"; state.layout = "sidebar"; app.dataset.layout = "sidebar"; } requestAnimationFrame(() => { renderPanels(); fit(); draw(); }); });
+  bind("optSituation", (v) => { state.situation = v; renderSources(); draw(); });
+  bind("optTheme", (v) => { if (v === "system") delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = v; draw(); if (state.cameraOn) renderPanels(); });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  window.addEventListener("resize", () => { renderPanels(); draw(); });
+  document.fonts?.ready.then(draw);
+
+  document.getElementById("mapname").textContent = `map ${D.map_name}`;
+  renderSources(); renderPanels(); fit(); draw();
+})();
+</script>

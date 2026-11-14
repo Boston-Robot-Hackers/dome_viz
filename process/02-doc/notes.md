@@ -34,3 +34,19 @@ The VM already sees the robot's topics: it's where RViz runs.
 **How to apply**: no extra network setup. If the VM ever stops seeing the
 robot's topics, check VMware's networking (it must stay bridged, for DDS
 discovery and so other machines can reach the page).
+
+## Web stack: aiohttp and plain canvas
+
+**Decided 2026-11-13 (TF01.0).**
+
+- **Server: `aiohttp`** (`python3-aiohttp`, 3.9 on Ubuntu 24.04; also a
+  rosdep key). One library serves both the static page and the websocket on
+  one port. `websockets` (10.4 in apt) only does websockets, so static files
+  would need a second server or a hack; `tornado` would work too but is
+  bigger and less familiar.
+- **It runs in its own thread with its own asyncio loop**, beside `rclpy`'s
+  executor. ROS callbacks hand messages over with
+  `asyncio.run_coroutine_threadsafe`, so neither side blocks the other.
+- **Browser: plain JavaScript and an HTML `<canvas>`, no library.** Pan,
+  zoom and a scale bar are a few dozen lines. No CDN (the page must work on a
+  LAN with no internet), no build step, nothing to vendor.
