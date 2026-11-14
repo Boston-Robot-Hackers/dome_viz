@@ -1,17 +1,18 @@
-# F01 — Live map view on the laptop
+# F01 — Live map view
 
 **Priority**: High
 
 **Done:** no
 
-**Tasks File Created:** no
+**Tasks File Created:** yes
 
 **Tests Written:** no
 
 **Test Passing:** no
 
 **Description**: A friendly, good-looking view of the robot's map as it is
-built, running entirely on a laptop connected to the robot. It shows the floor
+built, running entirely on a viewer machine connected to the robot (an Ubuntu
+VM in VMware on the Mac mini), and opened in any browser on the network. It shows the floor
 plan, the objects the robot has found, where the robot is and has been, and
 what the camera sees. It is meant to be easy to understand at a glance, for
 people who don't know RViz: **cleaned up and less detailed than the raw
@@ -24,18 +25,21 @@ topics, not a debugging tool.**
   the robot work or showing it to someone.
 - **The Pi has no CPU to spare** (I02 power and load work, TF33.9). A web
   page served from the Pi would add load there. **All the rendering and
-  serving happens on the laptop**; the Pi only publishes topics it already
+  serving happens on the viewer VM**; the Pi only publishes topics it already
   publishes.
 
 ## Architecture
 
-- **A new laptop-side package** (working name `dome_viz`). Nothing in it
-  runs on the Pi, and no robot package depends on it.
-- **A bridge node on the laptop** subscribes over ROS 2 (the same Wi-Fi DDS
-  link RViz already uses) and pushes a simplified state to the browser over a
-  local websocket.
-- **A web page served on localhost**, opened in the laptop's browser. Its
-  HTML, CSS and JS live in their own files, not in Python.
+- **A new package for the viewer VM** (`dome_viz`), an Ubuntu VM in VMware
+  on the Mac mini. Nothing in it runs on the Pi, and no robot package depends
+  on it.
+- **A bridge node on the VM** subscribes over ROS 2 (Wi-Fi DDS, so the VM
+  needs bridged networking) and pushes a simplified state to the browser over
+  a websocket.
+- **The VM serves the page on the local network.** Open it in the VM's own
+  browser or from any browser on the same network (e.g. Safari on the Mac
+  mini). Every page shares the one bridge, so more viewers add no load on the
+  Pi. Its HTML, CSS and JS live in their own files, not in Python.
 - **It only reads topics**, so it works the same against the live robot and
   against `ros2 bag play` of a recorded run (with `use_sim_time`), e.g.
   `~/bags/f36run6`. That also lets it be built and tested without the robot.
@@ -58,7 +62,11 @@ topics, not a debugging tool.**
 
 ## Decisions
 
-- **Laptop-side only.** No web server, bridge or extra node on the Pi.
+- **Viewer VM only.** No web server, bridge or extra node on the Pi.
+- **Served on the local network, no login.** The server listens on all the
+  VM's interfaces by default (a `host` parameter can narrow it to
+  `127.0.0.1`). It is read-only, but anyone on the network can see the map
+  and the camera, so it's for a trusted home or lab network.
 - **Camera costs Pi load, so it's off by default.** The bridge subscribes to
   the camera topic only while the camera panel is open. `dome_vision` only
   publishes the image when someone is subscribed, so a closed panel costs the
@@ -70,7 +78,8 @@ topics, not a debugging tool.**
 - Driving or commanding the robot from the page (teleop, goals, `/intent`).
 - Editing the map, naming rooms, moving or deleting targets.
 - Opening saved `~/.dome/semantic_maps/*.json` files without ROS running.
-- Phones and tablets, or viewing from a second machine on the network.
+- A layout designed for phones and tablets (desktop browsers only).
+- Logins, HTTPS, or viewing from outside the local network.
 - Fixing `/targets/markers` in RViz (a `dome_semantic` chore).
 
 ## Open questions for the task file
@@ -84,15 +93,16 @@ topics, not a debugging tool.**
 
 ## How to Demo
 
-**Setup**: on the laptop, a bag recorded with `/map` and
+**Setup**: on the viewer VM, a bag recorded with `/map` and
 `/oak/image_annotated_compressed` added to the usual topics, played with
 `ros2 bag play <bag> --clock`. The bridge runs with `use_sim_time:=true`, and
 the page is open in a browser. **Existing bags such as `f36run6` lack `/map`
 and the image**, so either record a new one, or run `slam_toolbox` on the
-laptop against the bag's `/scan` to rebuild the map.
+VM against the bag's `/scan` to rebuild the map.
 
 **Steps**:
-1. Open the page before starting the bag: it says it is waiting for data.
+1. Open the page before starting the bag, in the VM's browser and in a
+   browser on the Mac: both say they are waiting for data.
 2. Start the bag and watch the floor plan grow as the robot drives.
 3. Watch the soda can appear as "soda can · CN1", fade while out of view, and
    come back.
@@ -101,7 +111,7 @@ laptop against the bag's `/scan` to rebuild the map.
 
 **Expected output**: a clean floor plan with the robot, its trail and the
 labelled objects, updating live. With the camera panel closed, the Pi's CPU
-is the same as with no laptop viewer connected.
+is the same as with no viewer connected, however many pages are open.
 
 ## Process Gate
 

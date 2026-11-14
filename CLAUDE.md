@@ -15,7 +15,7 @@ Before writing or reviewing code, read and follow `.claude/style_guide.md`
 before committing; do not substitute a generic/plugin review for it.
 
 We are developing an app called dome_viz: a friendly, read-only view of the DOME
-robot's map as it is built, running on a laptop connected to the robot. All process files live under
+robot's map as it is built, running on a viewer VM (Ubuntu in VMware on the Mac mini) connected to the robot. All process files live under
 `process/`: literate docs in `process/01-literate/`, project docs in
 `process/02-doc/`, features in `process/03-features/`, tasks in
 `process/04-tasks/`, issues in `process/05-issues/`, and the spec at
@@ -33,7 +33,7 @@ not a `uv` project. From `~/ros2_ws`:
 
 The `Makefile` holds only user-facing tool targets (`make help` lists them).
 
-**It runs on the laptop, not the robot's Pi.** It may be developed in the
+**It runs on the viewer VM, not the robot's Pi.** It may be developed in the
 robot's workspace, but nothing in it should be launched on the Pi; see
 `process/02-doc/spec.md`.
 

@@ -1,12 +1,12 @@
 # dome_viz
 
 A friendly, read-only view of the DOME robot's map as it is built, running on a
-laptop connected to the robot: floor plan, found objects, robot position and
+viewer machine on the robot's network (served to any browser there): floor plan, found objects, robot position and
 trail, and the camera.
 
 ## Installation
 
-A ROS 2 package. On the laptop, in a ROS 2 workspace:
+A ROS 2 package. On the viewer machine, in a ROS 2 workspace:
 
 ```bash
 cd ~/ros2_ws/src

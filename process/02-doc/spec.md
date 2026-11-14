@@ -14,17 +14,19 @@ Everything is **cleaned up and less detailed than the raw topics** RViz shows.
 
 ## Where it runs
 
-- **On a laptop connected to the robot, never on the robot's Pi.** The Pi has
-  no CPU to spare, so all rendering and serving happens on the laptop.
-- The laptop reaches the robot over the same Wi-Fi ROS 2 (DDS) link RViz
-  already uses. The Pi only publishes topics it already publishes.
+- **On a viewer machine, never on the robot's Pi**: an Ubuntu VM in VMware
+  on the Mac mini. The Pi has no CPU to spare, so all rendering and serving
+  happens on the VM.
+- The VM reaches the robot over the same Wi-Fi ROS 2 (DDS) link RViz
+  uses, so VMware needs bridged networking. The Pi only publishes topics it already publishes.
 
 ## Architecture
 
-- **A bridge node on the laptop** subscribes to the robot's topics and pushes
-  a simplified state to the browser over a local websocket.
-- **A web page served on `localhost`**, opened in the laptop's browser. Its
-  HTML, CSS and JS live in their own files.
+- **A bridge node on the VM** subscribes to the robot's topics and pushes
+  a simplified state to the browser over a websocket.
+- **A web page the VM serves on the local network**, opened in the VM's
+  browser or any browser on that network (e.g. on the Mac). No login; for a
+  trusted network. Its HTML, CSS and JS live in their own files.
 - **Read-only**: it never publishes anything to the robot.
 - **Topic-driven**, so it works the same against the live robot and against
   `ros2 bag play` of a recorded run.
@@ -44,4 +46,4 @@ Display names and abbrevs for objects come from `dome_semantic`'s
 ## Dependencies
 
 - `dome_semantic_msgs` and `dome_semantic` (for its class profiles) on the
-  laptop. No robot package depends on `dome_viz`.
+  VM. No robot package depends on `dome_viz`.
