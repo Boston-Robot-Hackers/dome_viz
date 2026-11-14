@@ -33,7 +33,9 @@ replay). Changes from the plan: walls are **fitted straight segments**
 (`mockup/wall_lines.py`), not cleaned cells; a **coordinate grid** with a
 marked 0, 0; a **laser overlay** (`/scan`, rays and hits); the robot drawn
 from the URDF. No screenshot (built on the robot, no browser); the mockup is
-the reference. Theme left at follow-the-system.
+the reference. Theme left at follow-the-system. **Extended and re-approved
+the same day**: a run ticker and four small graphs (battery %, power draw,
+speed, objects found) with axes, full sidebar width (`mockup/series.py`).
 
 **Description**: A static, clickable mockup of the page, before any page
 code: the real floor plan from `f36run6.pgm`, the real targets from that run
@@ -63,6 +65,7 @@ TF01.4's messages if the layout needs fields they don't carry.
 
 **Description**: `ament_python` package: `package.xml` (`rclpy`,
 `nav_msgs`, `sensor_msgs`, `tf2_ros`, `dome_semantic_msgs`, `dome_semantic`,
+`dome_telemetry_msgs`,
 the TF01.0 library), `setup.py` installing `static/` and `launch/` into
 `share/`, one entry point for the bridge, `test/`. Update `CLAUDE.md`'s
 Commands if TF01.0 changes them.
@@ -119,6 +122,11 @@ same segments.
   quiet for more than a few seconds).
 - **Targets** also carry **seconds since last seen**, for the list's "2 min
   ago".
+- **Run**: the run start (the first `/map` this session) for the ticker, and
+  four series over the run, each thinned to at most ~1 point per 2 s and
+  capped in length: battery percent and power (`/telemetry/battery`), speed
+  (`/odom` linear speed), and objects found (count of confirmed targets).
+  On page load the whole series is sent; after that, new points only.
 
 *Test*: label with no profile falls back to the raw label; lost threshold
 at ±1 ms; trail skips sub-threshold moves and drops the oldest past the
@@ -148,6 +156,7 @@ both get the broadcast.
 - `/map` with slam_toolbox's QoS (reliable, transient local), so a page
   opened late still gets the current map.
 - `/scan` (sensor-data QoS), for the laser overlay.
+- `/telemetry/battery` and `/odom`, for the run graphs.
 - `/semantic/targets`, and the robot pose from TF `map → base_footprint`
   on a timer (~10 Hz).
 - **Camera**: subscribes to `/oak/image_annotated_compressed` only while

@@ -52,6 +52,7 @@ topics, not a debugging tool.**
 | **Objects** | `/semantic/targets` (`SemanticTargetArray`) | An icon or badge per target with its display name and ID (e.g. "soda can · CN1"). Lost targets shown faded, not hidden. Size readable at any zoom. |
 | **Robot** | TF `map → base_footprint` | A robot icon with heading, plus a trail of where it has driven this session. |
 | **Laser** | `/scan` (`LaserScan`) | The latest scan as faint dots in map coordinates, so what the robot sees right now shows up before slam_toolbox's next `/map` (every 10 s, `dome_nav`'s `map_update_interval`). Can be switched off. |
+| **Run** | first `/map`; `/telemetry/battery` (`dome_telemetry`); `/odom`; `/semantic/targets` | A run-time ticker (since this run's map started) and four small graphs over the run: battery %, power draw, speed, objects found. Small; the map stays the main display. |
 | **Camera** | `/oak/image_annotated_compressed` | A picture-in-picture view of the annotated image, which the user can switch off. |
 
 - **Pan and zoom** the map; **follow the robot** as an option.

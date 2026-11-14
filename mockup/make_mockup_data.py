@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # make_mockup_data — build the TF01.1 layout mockup's data.js from a real run
 # Author: Pito Salas and Claude Code
-# Version: 1
+# Version: 2
 # Created: 2026-11-13
 # Updated: 2026-11-13
 # Open Source Under MIT license
@@ -33,6 +33,7 @@ import yaml
 from nav_msgs.msg import OccupancyGrid
 from rclpy.serialization import deserialize_message
 from sensor_msgs.msg import LaserScan
+from series import run_series
 from tf2_msgs.msg import TFMessage
 from wall_lines import fit_walls
 
@@ -40,6 +41,9 @@ HOME = pathlib.Path.home()
 SEMANTIC_DIR = HOME / ".dome" / "semantic_maps"
 PROFILES = HOME / "ros2_ws" / "src" / "dome_semantic" / "config" / "class_profiles.yaml"
 OUT = pathlib.Path(__file__).parent / "data.js"
+# The viz01 drive recorded no battery data, and the UPS reader has logged none
+# since 11-05; the run panel uses this real earlier log as a sample.
+BATTERY_SAMPLE_LOG = HOME / ".dome" / "telemetry" / "10-23-telemetry"
 
 UNKNOWN, FREE, WALL = 0, 1, 2
 RESOLUTION_M = 0.05
@@ -308,6 +312,7 @@ def main() -> None:
         "clutter": [[round(float(x), 3), round(float(y), 3)] for x, y in clutter],
         "targets": build_targets(saved, profiles, bag_end_s(bag_dir)) if saved else [],
         "scan": latest_scan,
+        "run": run_series(bag_dir, saved, BATTERY_SAMPLE_LOG),
         "trail": [[round(x, 3), round(y, 3), round(th, 3)] for x, y, th in trail],
     }
     OUT.write_text(

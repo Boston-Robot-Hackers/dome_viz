@@ -86,7 +86,7 @@ body {
 
 /* main area */
 .main { position: relative; min-height: 0; display: grid; grid-template-columns: 1fr; }
-.app[data-layout="sidebar"] .main { grid-template-columns: 1fr 320px; }
+.app[data-layout="sidebar"] .main { grid-template-columns: 1fr 360px; }
 .stage { position: relative; min-width: 0; min-height: 0; overflow: hidden; touch-action: none; cursor: grab; }
 .stage.dragging { cursor: grabbing; }
 canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
@@ -162,6 +162,21 @@ canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: b
 .switch input:checked::after { transform: translateX(14px); }
 .switch input:focus-visible { outline: 2px solid var(--robot); outline-offset: 2px; }
 
+/* run ticker and small graphs */
+.ticker { font-family: var(--font-data); font-size: 12px; color: var(--fg); font-variant-numeric: tabular-nums;
+  padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.ticker .k { color: var(--muted); margin-right: 6px; }
+.graphs { display: grid; grid-template-columns: 1fr; gap: 14px; padding: 0 12px 12px; }
+.spark { position: relative; min-width: 0; }
+.spark .head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.spark .name { font-size: 11px; color: var(--muted); white-space: nowrap; }
+.spark .now { font-family: var(--font-data); font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.spark canvas { display: block; width: 100%; height: 84px; margin-top: 4px; cursor: crosshair; }
+.spark .tip { position: absolute; top: -4px; transform: translate(-50%, -100%); pointer-events: none;
+  padding: 3px 7px; border-radius: 6px; background: var(--fg); color: var(--surface);
+  font-family: var(--font-data); font-size: 11px; white-space: nowrap; }
+.graphs-note { padding: 0 12px 10px; font-size: 11px; color: var(--muted); }
+
 /* sidebar layout */
 .sidebar { display: none; border-left: 1px solid var(--line); background: var(--surface); min-height: 0; overflow-y: auto; flex-direction: column; }
 .app[data-layout="sidebar"] .sidebar { display: flex; }
@@ -229,7 +244,7 @@ canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: b
 
 <div class="app" id="app" data-layout="sidebar">
   <header class="topbar">
-    <div class="brand"><h1>DOME Map</h1><span class="mapname" id="mapname">map f36run6</span></div>
+    <div class="brand"><h1>DOME Map</h1><span class="mapname" id="mapname">map f36run6</span><span class="ticker" id="ticker" title="Time since this run's map started" aria-live="off"></span></div>
     <div class="status" id="status">
       <button class="status-line" id="statusLine" aria-expanded="false" aria-controls="statusDetails"></button>
       <div class="status-details" id="statusDetails" hidden></div>
@@ -619,7 +634,7 @@ canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: b
     const objF = document.getElementById("objectsFloat"), camF = document.getElementById("cameraFloat");
     const sidebar = document.getElementById("sidebar");
     const camInSide = side && state.cameraPlace === "sidebar";
-    sidebar.innerHTML = side ? `${camInSide ? `<section class="panel camera-side" aria-label="Camera">${cameraHTML()}</section>` : ""}<section class="panel" aria-label="Objects found">${objectsHTML()}</section>` : "";
+    sidebar.innerHTML = side ? `${camInSide ? `<section class="panel camera-side" aria-label="Camera">${cameraHTML()}</section>` : ""}${runHTML()}<section class="panel" aria-label="Objects found">${objectsHTML()}</section>` : "";
     objF.hidden = side; objF.innerHTML = side ? "" : objectsHTML();
     camF.hidden = camInSide; camF.innerHTML = camInSide ? "" : cameraHTML();
     if (camInSide) sidebar.querySelector(".camera-side .camera-body").style.padding = "0 12px 12px";
@@ -772,6 +787,124 @@ canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: b
   document.fonts?.ready.then(draw);
 
   document.getElementById("mapname").textContent = `map ${D.map_name}`;
-  renderSources(); renderPanels(); fit(); draw();
+  // ---- run ticker and small graphs ----
+  const R = D.run;
+  const clock = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60;
+    return h ? `${h}:${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}` : `${m}:${String(x).padStart(2, "0")}`; };
+  const loadedAt = performance.now();
+  function tick() {
+    const live = state.situation === "live";
+    const s = R.run_s + (live ? (performance.now() - loadedAt) / 1000 : 0);
+    document.getElementById("ticker").innerHTML = `<span class="k">Run</span>${clock(s)}`;
+  }
+  setInterval(tick, 1000);
+
+  const GRAPHS = [
+    { id: "battery", name: "Battery (%)", series: () => R.battery.percent, fmt: (v) => `${v.toFixed(0)} %`, unit: "%", min: 0, max: 100 },
+    { id: "power", name: "Power draw (W)", series: () => R.battery.power_w, fmt: (v) => `${v.toFixed(1)} W`, unit: "W", min: 0 },
+    { id: "speed", name: "Speed (m/s)", series: () => R.speed_mps, fmt: (v) => `${v.toFixed(2)} m/s`, unit: "m/s", min: 0 },
+    { id: "objects", name: "Objects found (count)", series: () => R.objects, fmt: (v) => `${v}`, min: 0, step: true },
+  ];
+  function runHTML() {
+    return `<section class="panel" aria-label="This run"><div class="panel-head"><h2>This run</h2></div><div class="graphs">${GRAPHS.map((g) => {
+      const s = g.series(); const last = s.v.length ? g.fmt(s.v[s.v.length - 1]) : "–";
+      return `<div class="spark" data-id="${g.id}"><div class="head"><span class="name">${g.name}</span><span class="now">${last}</span></div><canvas aria-label="${g.name} over this run, now ${last}"></canvas></div>`;
+    }).join("")}</div><div class="graphs-note">Mockup: battery is sample data from the ${R.battery.source.replace("-telemetry", "")} log.</div></section>`;
+  }
+  // nice tick step for a span, aiming for about `count` ticks
+  function niceStep(span, count) {
+    const raw = span / count, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const f = raw / mag;
+    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * mag;
+  }
+  const TIME_STEPS = [15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+  function drawSpark(el, hoverX) {
+    const g = GRAPHS.find((x) => x.id === el.dataset.id), s = g.series(), cv = el.querySelector("canvas");
+    const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (!w) return;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    const c = cv.getContext("2d"); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    if (!s.v.length) return;
+    // plot area inside the axes
+    const left = 40, right = 8, top = 6, bottom = 16;
+    const pw = w - left - right, ph = h - top - bottom;
+    const tMax = Math.max(R.run_s, s.t[s.t.length - 1]);
+    const vMin = g.min ?? Math.min(...s.v);
+    let vMax = g.max;
+    let yStep;
+    if (vMax == null) {
+      const peak = Math.max(...s.v) || 1;
+      yStep = g.step ? Math.max(1, niceStep(peak, 2)) : niceStep(peak, 2);
+      vMax = Math.ceil(peak / yStep) * yStep;
+      if (vMax <= peak) vMax += yStep;
+    } else {
+      yStep = niceStep(vMax - vMin, 2);
+    }
+    const X = (t) => left + (t / tMax) * pw;
+    const Y = (v) => top + ph - ((v - vMin) / (vMax - vMin)) * ph;
+    const muted = css("--muted"), lineCol = css("--line"), accent = css("--robot");
+    c.font = "10px IBM Plex Mono, monospace"; c.fillStyle = muted;
+    // y grid + labels
+    c.textAlign = "right"; c.textBaseline = "middle";
+    for (let v = vMin; v <= vMax + 1e-9; v += yStep) {
+      const y = Math.round(Y(v)) + .5;
+      c.strokeStyle = lineCol; c.lineWidth = 1; c.globalAlpha = v === vMin ? 1 : .6;
+      c.beginPath(); c.moveTo(left, y); c.lineTo(w - right, y); c.stroke(); c.globalAlpha = 1;
+      const label = g.step ? `${Math.round(v)}` : Number(v.toFixed(2)).toString();
+      c.fillText(label, left - 5, y);
+    }
+    // x ticks + labels (time since run start)
+    const tStep = TIME_STEPS.find((d) => tMax / d <= 5) ?? 3600;
+    c.textAlign = "center"; c.textBaseline = "top";
+    for (let tt = 0; tt <= tMax + 1e-9; tt += tStep) {
+      const x = Math.round(X(tt)) + .5;
+      c.strokeStyle = lineCol; c.beginPath(); c.moveTo(x, top + ph); c.lineTo(x, top + ph + 3); c.stroke();
+      c.fillText(clock(tt), Math.min(Math.max(x, left + 10), w - right - 12), top + ph + 4);
+    }
+    // y axis line
+    c.strokeStyle = lineCol; c.beginPath(); c.moveTo(left + .5, top); c.lineTo(left + .5, top + ph); c.stroke();
+    // series
+    const path = new Path2D();
+    s.t.forEach((tt, i) => {
+      const x = X(tt), y = Y(s.v[i]);
+      if (i === 0) path.moveTo(x, y);
+      else if (g.step) { path.lineTo(x, Y(s.v[i - 1])); path.lineTo(x, y); }
+      else path.lineTo(x, y);
+    });
+    const area = new Path2D(path); area.lineTo(X(s.t[s.t.length - 1]), Y(vMin)); area.lineTo(X(s.t[0]), Y(vMin)); area.closePath();
+    c.fillStyle = accent; c.globalAlpha = .12; c.fill(area); c.globalAlpha = 1;
+    c.strokeStyle = accent; c.lineWidth = 1.75; c.lineJoin = "round"; c.stroke(path);
+    const ex = X(s.t[s.t.length - 1]), ey = Y(s.v[s.v.length - 1]);
+    c.fillStyle = css("--surface"); c.beginPath(); c.arc(ex, ey, 3.5, 0, Math.PI * 2); c.fill();
+    c.fillStyle = accent; c.beginPath(); c.arc(ex, ey, 2.5, 0, Math.PI * 2); c.fill();
+    // hover crosshair + tooltip
+    el.querySelector(".tip")?.remove();
+    if (hoverX == null || hoverX < left) return;
+    const tAt = ((hoverX - left) / pw) * tMax;
+    let i = 0; while (i < s.t.length - 1 && s.t[i + 1] <= tAt) i++;
+    if (!g.step && i < s.t.length - 1 && Math.abs(s.t[i + 1] - tAt) < Math.abs(s.t[i] - tAt)) i++;
+    const hx = X(s.t[i]), hy = Y(s.v[i]);
+    c.strokeStyle = muted; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(Math.round(hx) + .5, top); c.lineTo(Math.round(hx) + .5, top + ph); c.stroke();
+    c.fillStyle = accent; c.beginPath(); c.arc(hx, hy, 3, 0, Math.PI * 2); c.fill();
+    const tip = document.createElement("div"); tip.className = "tip";
+    tip.textContent = `${clock(s.t[i])} · ${g.fmt(s.v[i])}`;
+    tip.style.left = `${Math.min(Math.max(hx, 50), w - 50)}px`;
+    el.appendChild(tip);
+  }
+  function drawSparks() {
+    document.querySelectorAll(".spark").forEach((el) => {
+      drawSpark(el, null);
+      const cv = el.querySelector("canvas");
+      if (cv.dataset.bound) return;
+      cv.dataset.bound = "1";
+      cv.addEventListener("pointermove", (e) => drawSpark(el, e.clientX - cv.getBoundingClientRect().left));
+      cv.addEventListener("pointerleave", () => drawSpark(el, null));
+    });
+  }
+  const baseRenderPanels = renderPanels;
+  renderPanels = function () { baseRenderPanels(); drawSparks(); };
+
+  tick(); renderSources(); renderPanels(); fit(); draw();
 })();
 </script>

@@ -14,8 +14,11 @@ browser. The mockup itself is the picture; open it to see the layout.
 - **Top bar**: name and map name on the left, **one status line** on the
   right.
 - **The map fills the rest**, with a **sidebar on the right** (about
-  320 px). Below 760 px wide, the sidebar gives way to floating panels.
-- **Sidebar, top to bottom**: the camera, then the objects list.
+  360 px). Below 760 px wide, the sidebar gives way to floating panels.
+- **Sidebar, top to bottom**: the camera, **This run** (four small graphs),
+  then the objects list.
+- **Run ticker** in the top bar after the map name: "Run 7:23", time since
+  this run's map started. It stops counting when the robot isn't connected.
 - **Map controls, bottom left**: the scale bar, then zoom + and −, Fit
   map, Follow robot, and Laser (shows or hides the scan).
 
@@ -54,6 +57,20 @@ browser. The mockup itself is the picture; open it to see the layout.
 - **Selecting** an object, on the map or in the list, never changes the
   zoom. The map pans smoothly only if the object is off-screen or behind a
   panel. Click it again, or click empty map, to deselect.
+
+## This run (small graphs)
+
+- **Four graphs stacked, each the full sidebar width** and about 84 px
+  tall: Battery (%, fixed 0–100), Power draw (W), Speed (m/s), Objects found
+  (count, a step line). Each spans the run so far. The unit is in the title.
+- **Axes on every graph**: a y scale on the left with rounded tick values
+  (about three, from 0) and faint grid lines at them; a time axis along the
+  bottom in minutes:seconds since the run started, about five ticks.
+- **Each shows its current value** beside its title, a thin line with a
+  faint fill, and an emphasised end point.
+- **Hover** shows a crosshair and the time and value at that point.
+- One colour (the robot's) for all four: each graph is one series, named by
+  its title, so no legend.
 
 ## Camera
 
