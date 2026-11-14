@@ -9,8 +9,14 @@
   `process/04-tasks/notdone/`. **TF01.0 done** (aiohttp + plain canvas,
   `notes.md`). **TF01.1 done**: layout agreed, in `process/02-doc/layout.md`;
   mockup in `mockup/` (published at
-  https://claude.ai/artifact/H16mhXiNCF5SCbWkBYuQQH). **Next: TF01.2,
-  package skeleton.**
+  https://claude.ai/artifact/H16mhXiNCF5SCbWkBYuQQH), extended the same
+  day with a run ticker and four graphs. **Next: TF01.2, package skeleton.**
+- **Open decision before TF01.2**: ruff's `ERA001` flags the header lines
+  the pre-commit hook stamps (`# Version:`, `# Created:`, `# Updated:`) as
+  commented-out code, on every `.py`. Like `EXE001`, a rule clash: turn it
+  off in `ruff.toml`, or not? Ask the user.
+- **Not pushed**: `e8837f0`, `a59d2e8` (and earlier unpushed commits in
+  `dome_vision`, `dome_control`, `dome_semantic`).
 - **Replay bag for TF01.10 recorded**: `~/bags/viz01` on the robot (446 s,
   with `/map` and `/oak/image_annotated_compressed`). Not yet copied to the
   VM. Its targets from a bag replay are in
