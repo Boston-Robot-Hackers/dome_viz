@@ -35,6 +35,24 @@ The VM already sees the robot's topics: it's where RViz runs.
 robot's topics, check VMware's networking (it must stay bridged, for DDS
 discovery and so other machines can reach the page).
 
+## Editing `static/` needs a `colcon build`
+
+**Found 2026-11-14 (TF01.7).** The bridge serves the page from the
+*installed* `share/dome_viz/static/`, not from `src/`. **Every edit under
+`static/` needs `colcon build --packages-select dome_viz`** before it reaches
+the browser, and then a hard reload (`Ctrl+Shift+R`) because the browser
+caches the CSS and JS.
+
+**`--symlink-install` does not help.** The symlink chain it builds
+(`install` → `build` → `src`) is correct, but the page then serves nothing:
+`aiohttp`'s `add_static` takes `follow_symlinks=False` by default and refuses
+symlinked files. Loosening that for a convenience is not worth it.
+
+**How to apply**: after changing the page, rebuild, then hard-reload. If a
+change seems to have no effect, `curl` the asset and grep for it before
+suspecting the code:
+`curl -s http://127.0.0.1:8080/static/app.js | grep <something new>`.
+
 ## `caplog` does not work in this workspace
 
 **Found 2026-11-14 (TF01.5).** Pytest's `caplog` fixture captures nothing

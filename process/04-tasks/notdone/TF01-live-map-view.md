@@ -241,7 +241,40 @@ and the last "camera off". A pose push is skipped when TF has no transform.
 
 ## TF01.7 — Page: floor plan, robot, pan and zoom
 
-**Status**: not done
+**Status**: code written 2026-11-14, **manual browser test pending** — see
+"TF01.7 manual test" in `current.md`.
+
+`static/index.html`, `static/app.css`, `static/app.js` (654 lines in all),
+ported from the approved mockup. Verified end to end against
+`~/.dome/bags/viz01` at 20x: the page and both assets serve with the right
+MIME types, and one websocket client received 42 `floor_plan`, 820 `robot`,
+162 `trail`, 49 `laser` and 410 `status` messages with no error or warning
+from the node. **What is not verified is the rendering itself** — that needs
+a browser.
+
+- **No webfont CDN.** The mockup loads Archivo and IBM Plex Mono from Google
+  Fonts; the page must work on a LAN with no internet (`notes.md`, "Web
+  stack"), so it uses the system stacks those declarations already fell back
+  to. The design is otherwise unchanged.
+- **The floor grid is flipped on decode.** The `floor_plan` message is in
+  `OccupancyGrid` order, row 0 at the lowest y; canvas rows run downwards.
+  `decodeFloor` flips once, so every drawing routine can treat field row 0 as
+  the top. Checked against a real message: 131x232, base64 decoding to
+  exactly 30392 bytes with only the values 0 and 1.
+- **The floor raster is the only expensive step**, so it is cached and
+  rebuilt only on a new map or a theme change; repaints are coalesced into one
+  animation frame. `px` (pixels per cell) is chosen per map so the raster
+  never exceeds 2048 on its longer side — at a fixed 8 px/cell a 500x500 room
+  would have been a 16 M-pixel stall on the main thread.
+- **Included beyond the task's wording**: the coordinate grid, origin marker
+  and laser overlay, because `layout.md` puts all three in the Map section and
+  neither TF01.7 nor TF01.8 names them; and a waiting-for-the-map state,
+  since without it the page is a blank void before the first `/map`.
+- **A plain-text connection state** sits where TF01.8's designed status line,
+  details panel and offline banner will go. It was needed to test this task at
+  all. TF01.8 replaces it.
+- **TF01.8's panels belong in their own file**, not appended to `app.js`
+  (already 483 lines); it is the map view and should stay that.
 
 **Description**: `index.html` + `app.css` + `app.js`: draw the floor plan
 on a canvas in a clean palette (walls dark, free light, unknown as page

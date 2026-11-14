@@ -1,0 +1,124 @@
+/* app.css — the page's look: palette, both themes, and the map stage.
+   Objects, camera, status panel and the run graphs arrive in TF01.8.
+   Fonts are system stacks on purpose: the page must work on a LAN with no
+   internet, so there is no webfont CDN (notes.md, "Web stack"). */
+:root {
+  --unknown: #e6e8e4;      /* unexplored: the page itself */
+  --floor: #fbfbf7;        /* free space */
+  --wall: #28303b;         /* walls, drawn as ink */
+  --surface: #ffffff;      /* panels */
+  --line: #d3d7d0;
+  --fg: #1d232b;
+  --muted: #646d77;
+  --robot: #0b7a83;
+  --grid: rgb(40 48 59 / .10);
+  --axis: #3d4652;
+  --clutter: #8b939c;
+  --ok: #2f8f46;
+  --warn: #b7791f;
+  --bad: #c93c3c;
+  --shadow: 0 1px 2px rgb(20 30 40 / .08), 0 6px 20px rgb(20 30 40 / .10);
+  --font-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-data: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --unknown: #12161b; --floor: #232a33; --wall: #d9dfe6; --surface: #1a2027;
+    --line: #313a45; --fg: #e8ecf0; --muted: #98a2ad; --robot: #3fc6cf;
+    --grid: rgb(217 223 230 / .10); --axis: #c3cbd4; --clutter: #6c7784;
+    --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
+    --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --unknown: #12161b; --floor: #232a33; --wall: #d9dfe6; --surface: #1a2027;
+  --line: #313a45; --fg: #e8ecf0; --muted: #98a2ad; --robot: #3fc6cf;
+  --grid: rgb(217 223 230 / .10); --axis: #c3cbd4; --clutter: #6c7784;
+  --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
+  --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
+  color-scheme: dark;
+}
+
+/* The `hidden` attribute only works through the UA stylesheet's
+   `[hidden] { display: none }`, and any author rule that sets `display` beats
+   it on origin precedence, specificity notwithstanding. `.empty` sets
+   `display: grid`, so without this the overlay can never be hidden. */
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--unknown); color: var(--fg);
+  font-family: var(--font-ui); font-size: 14px; overflow: hidden;
+}
+.app { height: 100%; display: grid; grid-template-rows: auto 1fr; }
+
+/* top bar */
+.topbar {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: var(--surface); border-bottom: 1px solid var(--line); z-index: 5;
+}
+.brand { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.brand h1 { font-size: 17px; font-weight: 700; letter-spacing: .01em; margin: 0; }
+.ticker {
+  font-family: var(--font-data); font-size: 12px; font-variant-numeric: tabular-nums;
+  padding: 2px 8px; border: 1px solid var(--line); border-radius: 6px;
+}
+.ticker .k { color: var(--muted); margin-right: 6px; }
+
+/* A plain-text stand-in for TF01.8's designed status line and details panel. */
+.state {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; white-space: nowrap;
+}
+.state .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.state[data-state="live"] .dot { background: var(--ok); }
+.state[data-state="waiting_for_map"] .dot { background: var(--warn); }
+.state[data-state="not_connected"] .dot { background: var(--bad); }
+.state .sub { color: var(--muted); font-family: var(--font-data); font-size: 12px; }
+
+/* map stage */
+.main { position: relative; min-height: 0; }
+.stage {
+  position: absolute; inset: 0; overflow: hidden;
+  touch-action: none; cursor: grab;
+}
+.stage.dragging { cursor: grabbing; }
+canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* waiting-for-the-map state */
+.empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; z-index: 2; padding: 24px; }
+.empty h2 { font-size: 18px; margin: 0 0 6px; font-weight: 600; }
+.empty p { margin: 0; color: var(--muted); max-width: 40ch; line-height: 1.5; }
+.empty code { font-family: var(--font-data); font-size: 12px; }
+.spinner {
+  width: 26px; height: 26px; margin: 0 auto 14px;
+  border: 3px solid var(--line); border-top-color: var(--robot);
+  border-radius: 50%; animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+
+/* map controls, bottom left */
+.controls {
+  position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); bottom: 12px;
+  display: flex; flex-direction: column; gap: 10px; align-items: flex-start; z-index: 3;
+}
+.btnrow { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  color: var(--fg); font: inherit; font-size: 13px; cursor: pointer; box-shadow: var(--shadow);
+}
+.btn.square { width: 32px; padding: 0; justify-content: center; font-size: 17px; }
+.btn[aria-pressed="true"] { background: var(--robot); color: var(--surface); border-color: var(--robot); }
+.btn:focus-visible { outline: 2px solid var(--robot); outline-offset: 2px; }
+.scalebar { font-family: var(--font-data); font-size: 11px; color: var(--muted); display: flex; flex-direction: column; gap: 3px; }
+.scalebar .bar { height: 6px; border: 1.5px solid var(--fg); border-top: 0; opacity: .7; }
+
+@media (max-width: 760px) {
+  .state .sub { display: none; }
+}

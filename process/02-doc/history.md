@@ -43,6 +43,17 @@
   camera subscription is reconciled on the executor's thread from the pose
   timer, because `on_camera_change` arrives on the web server's thread.
   `package.xml` gained `ament_index_python` and a `geometry_msgs` test dep.
+- **TF01.7's page written**: `static/index.html`, `app.css`, `app.js`. The
+  map renders correctly from live data — **confirmed in a browser** (the
+  `OccupancyGrid` row flip is right). Two bugs found and fixed while testing:
+  `element.hidden` could not hide the "waiting for the map" overlay, because
+  an author `display: grid` beats the UA stylesheet's `[hidden]` rule on
+  origin precedence; and the page's assets must be `colcon build`-ed to reach
+  the browser (`notes.md`, "Editing `static/` needs a `colcon build`").
+- **First live run against the robot**, rather than a bag. The map, pose and
+  run ticker all worked. It exposed **I01**: a dead robot still reports
+  "live" at a frozen pose, because `Time()` TF lookups keep succeeding from a
+  stale buffer and the pose timer then refreshes its own liveness.
 - **Replay bags copied to the VM's `~/.dome/bags/`** (`viz01` 172 MB with
   `/map` and the camera, `f36run6` 30 MB). Transfers first failed with
   `Received message too long`: the Pi's `~/.bashrc` printed on

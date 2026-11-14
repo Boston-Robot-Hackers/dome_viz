@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOME Map</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>DOME Map</h1>
+      <span class="ticker" id="ticker" title="Time since this run started"><span class="k">Run</span><span id="runTime">—</span></span>
+    </div>
+    <div class="state" id="state" data-state="offline">
+      <span class="dot"></span>
+      <span id="stateText">Connecting…</span>
+      <span class="sub" id="stateSub"></span>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="stage" id="stage">
+      <canvas id="map" aria-label="Floor plan of the area the robot has mapped"></canvas>
+
+      <div class="empty" id="empty">
+        <div>
+          <div class="spinner"></div>
+          <h2>Waiting for the map</h2>
+          <p>No map has arrived yet. Start SLAM on the robot, or play a bag with <code>--clock</code>.</p>
+        </div>
+      </div>
+
+      <div class="controls">
+        <div class="scalebar" id="scalebar">
+          <div class="bar" id="scalebarBar"></div>
+          <span id="scalebarLabel">1 m</span>
+        </div>
+        <div class="btnrow">
+          <button class="btn square" id="zoomIn" aria-label="Zoom in">+</button>
+          <button class="btn square" id="zoomOut" aria-label="Zoom out">−</button>
+          <button class="btn" id="fit">Fit map</button>
+          <button class="btn" id="follow" aria-pressed="false">Follow robot</button>
+          <button class="btn" id="laser" aria-pressed="true" title="Show what the laser sees right now">Laser</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="/static/app.js"></script>
+</body>
+</html>

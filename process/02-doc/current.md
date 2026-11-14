@@ -4,23 +4,91 @@
 
 - **F01, live map view, in progress.** Feature in
   `process/03-features/notdone/`, task file TF01 in `process/04-tasks/notdone/`.
-  **TF01.0–TF01.6 done** (see `history.md`). **Next is TF01.7**, the page's
-  floor plan, robot, pan and zoom — the first browser-side task.
+  **TF01.0–TF01.6 done**, and **TF01.7's map renders correctly from live
+  robot data** (see `history.md`). **Next: finish TF01.7's checklist, then
+  TF01.8**, the whole sidebar — objects list, camera panel, status line and
+  the four run graphs. **The graphs do not exist yet**; that is TF01.8, not a
+  fault.
 
-### Next: TF01.7, the page
+- **Open issue I01** (`process/05-issues/open/`): a dead robot still reports
+  "live" at a frozen pose. Found on the first live run. Wants a decision, not
+  a quick patch — read it before touching `push_pose` or the status logic.
 
-The server side is complete: **74 tests pass**, `ruff` clean. TF01.7 and
-TF01.8 are browser work (`static/index.html`, `app.css`, `app.js`), starting
-from the approved mockup in `mockup/` — see `process/02-doc/layout.md`.
-Their tests are manual, in a browser against bag replay.
+### TF01.7 manual test — part done
 
-**There is no `launch/` file yet** (that is TF01.9), so start the bridge by
-hand:
+**Confirmed in a browser against the live robot on 2026-11-14: the map
+renders correctly** — right way up, not mirrored, robot inside the mapped
+area. That was the one thing no probe could check, and it means the
+`OccupancyGrid` row flip in `decodeFloor` is correct.
+
+**Still unchecked — steps 2 to 8 below.** Nobody has exercised pan, zoom,
+Fit map, Follow robot, the scale bar, the Laser toggle or the two themes.
+Work through them and record the result here.
+
+Remember: **after any edit under `static/`, `colcon build` and then hard-
+reload** (`notes.md`). Two rounds were lost to that and to the `[hidden]`
+CSS bug, both now fixed.
+
+Run it, in two terminals:
 
 ```
 ros2 run dome_viz bridge_node --ros-args -p use_sim_time:=true
 ros2 bag play ~/.dome/bags/viz01 --clock
 ```
+
+Then open `http://localhost:8080/` and check, recording the result here:
+
+1. ~~**The floor plan appears** the right way up and not mirrored.~~
+   **Confirmed 2026-11-14 against the live robot.**
+2. **The grid and origin**: faint lines, stronger x and y axes, a dot
+   labelled `0, 0`, x to the right and y up.
+3. **The robot** draws to scale with a heading chevron, and the trail
+   follows it as a soft line.
+4. **Pan** by dragging, **zoom** on the wheel and with + / −, **Fit map**
+   frames the whole map, **Follow robot** keeps it centred and switches off
+   as soon as you drag.
+5. **The scale bar** changes its labelled length as you zoom.
+6. **Laser** toggles the scan overlay.
+7. **The run ticker** counts up; the state reads "Live".
+8. **Dark and light** both look right (change the OS theme while it runs —
+   the floor raster rebuilds on the theme change).
+
+**There is no `launch/` file yet** (that is TF01.9), hence running the node
+by hand. **The whole sidebar is missing — camera, the four run graphs and
+the objects list are all TF01.8**, so expect only the top bar and the map.
+
+### Running against the live robot
+
+Same thing without `use_sim_time`, which must be off or the node's clock
+freezes with no `/clock` publisher:
+
+```
+ros2 run dome_viz bridge_node
+```
+
+**The robot's own stack has to be up first.** With nothing running on the Pi
+the VM sees only `/parameter_events` and `/rosout`, and the page correctly
+sits on "Waiting for the map". From `dome2/launch/robot.launch.py`'s header:
+
+```
+bl dome2 robot.launch.py                            # drivers, control, vision
+bl dome_nav robot_map.launch.py --map_name <name>   # Mode A: mapping, gives /map
+```
+
+Verified 2026-11-14: discovery needs no setup — both machines have
+`ROS_DOMAIN_ID` unset and `ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET`, and the
+robot answers in ~7 ms.
+
+Two things seen live, neither a `dome_viz` fault:
+
+- **Battery is published as `/battery`, not `/telemetry/battery`.** The
+  bridge subscribes to the latter, which is the one that is temporarily
+  disabled, so the battery graphs stay empty. Check which topic it comes back
+  on before changing anything.
+- **The laser overlay never appeared**, because `map` was missing from TF
+  entirely, so `take_scan`'s lookup failed every time. Same root cause as
+  **I01**; it is not a `/scan` QoS problem (the publisher is RELIABLE, and a
+  BEST_EFFORT subscriber is compatible with that).
 
 **One open decision, due at TF01.9.** `bridge_node`'s `class_profile_path`
 parameter defaults to `""`, which makes targets show a raw label and a
@@ -83,5 +151,8 @@ running `dome_semantic` live against the replay regenerates them (that is how
 - **Noticed on the Pi, outside this project**: `~/.bashrc` exports
   `ROBOFLOW_API_KEY` in plaintext. Worth moving to an untracked file that
   `.bashrc` sources, since dotfiles tend to end up in repos.
-- **Literate docs** in `process/01-literate/` cover every module through
-  TF01.6.
+- **Literate docs** in `process/01-literate/` cover every Python module,
+  through TF01.6. **The page has none**: `.claude/literate.md`'s prompt is
+  written for Python ("convert the following Python program"), and the page is
+  still half-built. Worth one for `app.js` once TF01.8 lands — decide then
+  whether the prompt covers JS.
