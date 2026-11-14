@@ -7,6 +7,9 @@
 line-length = 88
 
 [lint]
+# ERA001 (commented-out code): the pre-commit hook stamps `# Version: 1` and
+# similar header lines, which ERA001 reads as code. Review catches the rest.
+ignore = ["ERA001"]
 select = [
     "E",      # pycodestyle errors
     "W",      # pycodestyle warnings

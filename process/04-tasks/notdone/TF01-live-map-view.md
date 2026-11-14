@@ -61,7 +61,11 @@ TF01.4's messages if the layout needs fields they don't carry.
 
 ## TF01.2 — Package skeleton
 
-**Status**: not done
+**Status**: done 2026-11-14 — `colcon build` passes and `test/test_imports.py`
+imports every module (2 passed). `bridge_node.py` is an empty node for now;
+`static/` and `launch/` are globbed and fill in with TF01.5–TF01.7.
+`ruff.toml` ignores `ERA001` (it reads the stamped header lines as code;
+user's call).
 
 **Description**: `ament_python` package: `package.xml` (`rclpy`,
 `nav_msgs`, `sensor_msgs`, `tf2_ros`, `dome_semantic_msgs`, `dome_semantic`,
@@ -75,7 +79,16 @@ test loads each module.
 
 ## TF01.3 — Floor plan cleanup (pure)
 
-**Status**: not done
+**Status**: done 2026-11-14 — `floor_plan.py` (classify, specks, holes,
+`FloorPlanner` holding direction and unchanged walls) and `wall_fit.py`
+(the line fitter, ported from `mockup/wall_lines.py`; split out to keep both
+files under ~300 lines). Tests in `test_floor_plan.py` and
+`test_wall_fit.py`; fixture `test/fixtures/f36run6.pgm` + `.yaml`. On
+`f36run6` (sparse walls: 105 wall cells, 67 of them specks) the fit gives
+one segment in 0.04 s on the Pi. `package.xml` gained `python3-numpy`
+(exec) and `python3-yaml` (test, for the fixture loader). **Fixed the same
+day**: the direction now locks only once there is enough wall (200 cells or
+3 m fitted), not on the first map; see `chores.md`.
 
 **Description**: `floor_plan.py`: `OccupancyGrid` data (width, height,
 resolution, origin, cells) → a compact grid of three classes, wall / free /
@@ -99,7 +112,19 @@ same segments.
 
 ## TF01.4 — View state (pure)
 
-**Status**: not done
+**Status**: done 2026-11-14 — `view_state.py` (`ViewState`: `on_*` per
+source, `tick` ~1 Hz, `snapshot` for a new page) and `run_history.py`
+(`History`, `Trail`, `RunSeries`; split out for size). Tests in
+`test_view_state.py` and `test_run_history.py` (55 pass in all).
+
+- **Labels are a copy in `dome_viz`** (user's call): `dome_semantic`'s
+  `short_label` lives in a module that imports `rclpy`.
+- **Deltas without per-page state**: a new page's snapshot holds only points
+  already broadcast, so the next delta completes it with no duplicates.
+- **Status also lists `battery` and `odom`**, since they count toward "robot
+  connected" and the run gap.
+- **The `run` ticker** goes out as `run_s` in each status message, not as a
+  clock time, so it works under bag replay's sim time.
 
 **Description**: `view_state.py` builds the JSON messages the page gets:
 
@@ -116,25 +141,39 @@ same segments.
   can draw rays. Downsampled, at most ~5 Hz.
 - **Trail**: append a point only when the robot has moved more than a few
   cm; cap its length.
+  - **Stored in `odom`**, not `map`. Each send converts the points through
+    the *current* `map → odom`, so a slam_toolbox loop closure moves the
+    whole trail with the map instead of leaving it cutting through walls.
+  - **Held on the server**: on page load the whole trail is sent; after
+    that, new points only.
+  - **Cleared at run start**, together with the run ticker.
 - **Status**: per source (map, targets, pose, laser, camera), seconds since
   the last message, plus the one overall state the page shows as a sentence:
   live, waiting for the map, or robot not connected (all robot sources
   quiet for more than a few seconds).
 - **Targets** also carry **seconds since last seen**, for the list's "2 min
   ago".
-- **Run**: the run start (the first `/map` this session) for the ticker, and
+- **Run**: the run start for the ticker, and
   four series over the run, each thinned to at most ~1 point per 2 s and
   capped in length: battery percent and power (`/telemetry/battery`), speed
   (`/odom` linear speed), and objects found (count of confirmed targets).
   On page load the whole series is sent; after that, new points only.
+  - **Run start is a quiet gap** (decided 2026-11-14): the first robot
+    message after every robot source has been silent for over ~30 s (or the
+    first one ever) starts a new run, clearing the trail and series and
+    restarting the ticker.
 
 *Test*: label with no profile falls back to the raw label; lost threshold
 at ±1 ms; trail skips sub-threshold moves and drops the oldest past the
-cap; status reports a source never heard from.
+cap; a changed `map → odom` shifts every trail point by that transform; a
+new page gets the full trail, then only new points; run start empties the
+trail; status reports a source never heard from.
 
 ## TF01.5 — Local web server
 
-**Status**: not done
+**Status**: in progress — `web_server.py` and `test/test_web_server.py`
+written on the Pi but never run (no `aiohttp` there); run and finish them on
+the VM. Details in `current.md`.
 
 **Description**: `web_server.py` serves `static/` and one websocket on
 the local network: `host` (default `0.0.0.0`, all interfaces) and `port`

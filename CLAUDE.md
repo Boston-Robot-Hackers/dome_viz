@@ -26,6 +26,8 @@ robot's map as it is built, running on a viewer VM (Ubuntu in VMware on the Mac 
 `dome_viz` is a ROS 2 package (`ament_python`) in the `~/ros2_ws` workspace,
 not a `uv` project. From `~/ros2_ws`:
 
+- `rosdep install --from-paths src/dome_viz -y` once per machine (installs
+  `python3-aiohttp`)
 - `colcon build --packages-select dome_viz` (setup)
 - `source install/setup.bash`, then `python3 -m pytest src/dome_viz/test`
   (tests)
