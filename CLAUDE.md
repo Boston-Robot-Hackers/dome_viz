@@ -26,8 +26,11 @@ robot's map as it is built, running on a viewer VM (Ubuntu in VMware on the Mac 
 `dome_viz` is a ROS 2 package (`ament_python`) in the `~/ros2_ws` workspace,
 not a `uv` project. From `~/ros2_ws`:
 
-- `rosdep install --from-paths src/dome_viz -y` once per machine (installs
-  `python3-aiohttp`)
+- `rosdep install --from-paths src/dome_viz src/dome_semantic_msgs
+  src/dome_telemetry_msgs src/dome_semantic --ignore-src -y` once per machine
+  (installs `python3-aiohttp`). All four paths and `--ignore-src` are
+  required: the three sibling packages are built from source, so rosdep fails
+  to resolve them as apt keys if they are not in the given paths.
 - `colcon build --packages-select dome_viz` (setup)
 - `source install/setup.bash`, then `python3 -m pytest src/dome_viz/test`
   (tests)

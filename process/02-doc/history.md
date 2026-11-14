@@ -28,3 +28,23 @@
 - **Development moved to the viewer VM**: the Pi lacks `aiohttp` and `ruff`.
   Test data copied into `test/fixtures/` (the `f36run6` map; semantic maps
   `f36run6`, `viz01`, `viz01replay`).
+- **The VM is set up and verified**: ROS kilted, Python 3.12, `aiohttp`
+  3.9.1, `ruff` 0.16.1, `pydantic` 2.13.4; `dome_semantic_msgs`,
+  `dome_telemetry_msgs` and `dome_semantic` all present in `~/ros2_ws/src`;
+  `core.hooksPath` set to `.githooks`.
+- **`CLAUDE.md`'s `rosdep` command was wrong** and could never have worked:
+  three `package.xml` deps are workspace source packages, so all four paths
+  and `--ignore-src` are needed (`chores.md`).
+- **TF01.5 done**: `web_server.py` ran for the first time and needed no
+  changes. One test did — `caplog` captures nothing in this workspace
+  because ROS's `launch.logging` sets `propagate = False` on every logger
+  (`notes.md`). First `ruff` run on the package: clean, two lines reflowed.
+- **TF01.6 done**: `bridge_node.py` and 11 tests, passing first run. The
+  camera subscription is reconciled on the executor's thread from the pose
+  timer, because `on_camera_change` arrives on the web server's thread.
+  `package.xml` gained `ament_index_python` and a `geometry_msgs` test dep.
+- **Replay bags copied to the VM's `~/.dome/bags/`** (`viz01` 172 MB with
+  `/map` and the camera, `f36run6` 30 MB). Transfers first failed with
+  `Received message too long`: the Pi's `~/.bashrc` printed on
+  non-interactive sessions, which breaks `rsync`, `scp` and `sftp` alike.
+  The `~/rosutils/*.bash` echoes are now guarded with `case $- in *i*)`.

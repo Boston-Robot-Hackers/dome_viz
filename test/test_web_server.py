@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 # test_web_server — page, websocket snapshot and broadcast, camera toggle
 # Author: Pito Salas and Claude Code
-# Version: 1
+# Version: 2
 # Created: 2026-11-14
 # Updated: 2026-11-14
 # Open Source Under MIT license
 
 import asyncio
 import json
+import logging
 import socket
 
 import aiohttp
 import pytest
 
 from dome_viz.web_server import ServerConfig, WebServer
+from dome_viz.web_server import logger as server_logger
 
 HOST = "127.0.0.1"
 RECEIVE_TIMEOUT_S = 2.0
@@ -24,6 +26,35 @@ def free_port() -> int:
     with socket.socket() as probe:
         probe.bind((HOST, 0))
         return probe.getsockname()[1]
+
+
+class WarningCollector(logging.Handler):
+    """Keeps the messages logged while it is attached to a logger."""
+
+    def __init__(self):
+        super().__init__()
+        self.messages: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.messages.append(record.getMessage())
+
+
+@pytest.fixture
+def logged_warnings():
+    """The messages `web_server` logs, as a growing list.
+
+    Attached straight to the module's logger because `caplog` cannot see
+    them: ROS's `launch.logging` calls `logging.setLoggerClass` with a class
+    whose instances have `propagate = False`, so no record of any logger
+    created after that import reaches pytest's root handler.
+    """
+    collector = WarningCollector()
+    old_level = server_logger.level
+    server_logger.setLevel(logging.WARNING)
+    server_logger.addHandler(collector)
+    yield collector.messages
+    server_logger.removeHandler(collector)
+    server_logger.setLevel(old_level)
 
 
 @pytest.fixture
@@ -118,13 +149,17 @@ def test_camera_toggle_reaches_callback_and_only_camera_pages_get_frames(server)
     asyncio.run(talk())
 
 
-def test_unexpected_page_message_is_ignored(server, caplog):
+def test_unexpected_page_message_is_ignored(server, logged_warnings):
     async def talk():
         async with aiohttp.ClientSession() as session:
             page = await session.ws_connect(url(server, "/ws"))
             await receive_json(page)
             await page.send_str("not json")
-            await wait_for(lambda: "unexpected page message" in caplog.text)
+            await wait_for(
+                lambda: any(
+                    "unexpected page message" in message for message in logged_warnings
+                )
+            )
 
     asyncio.run(talk())
     assert server.camera_changes == []

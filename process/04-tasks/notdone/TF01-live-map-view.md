@@ -171,9 +171,20 @@ trail; status reports a source never heard from.
 
 ## TF01.5 — Local web server
 
-**Status**: in progress — `web_server.py` and `test/test_web_server.py`
-written on the Pi but never run (no `aiohttp` there); run and finish them on
-the VM. Details in `current.md`.
+**Status**: done 2026-11-14 — `web_server.py` and `test/test_web_server.py`
+run for the first time on the VM (`aiohttp` 3.9.1); **63 tests pass**, `ruff
+check` and `ruff format --check` clean on `dome_viz/`, `test/` and
+`setup.py`.
+
+- **`web_server.py` needed no changes** — it worked as written.
+- **One test did**: it asserted on `caplog.text`, which captures nothing in
+  this workspace. ROS's `launch.logging` sets a logger class with
+  `propagate = False`, so no record reaches pytest's root handler; the
+  `launch_testing` plugins load it before collection. Replaced with a
+  `logged_warnings` fixture that attaches a handler straight to the module's
+  logger. See `notes.md`, "`caplog` does not work in this workspace".
+- `ruff format` also reflowed two lines in `test_floor_plan.py` (first ruff
+  run on the package).
 
 **Description**: `web_server.py` serves `static/` and one websocket on
 the local network: `host` (default `0.0.0.0`, all interfaces) and `port`
@@ -188,7 +199,26 @@ both get the broadcast.
 
 ## TF01.6 — Bridge node
 
-**Status**: not done
+**Status**: done 2026-11-14 — `bridge_node.py` (269 lines) and
+`test/test_bridge_node.py` (11 tests). **74 tests pass**, ruff clean.
+
+- **The camera subscription is reconciled on our own thread.** The server's
+  `on_camera_change` runs on the server's thread, and creating or destroying
+  a subscription there would race `rclpy`'s executor, so it only records the
+  wish under the lock; `reconcile_camera` acts on it from the pose timer
+  (10 Hz, so the panel responds within 0.1 s).
+- **No rate limiting was added.** `ViewState` already throttles the laser and
+  thins the run series, and returns no messages when nothing is new, so the
+  `if messages` guard in `feed` is the whole of it.
+- **`feed(method, *args)`** holds the lock, appends `now_s` and broadcasts,
+  so the six callbacks don't repeat that body.
+- **Labels need a path**: new parameter `class_profile_path`, default `""`
+  (empty profiles, so targets fall back to the raw label and a two-letter
+  prefix). `dome_semantic` does not install its `class_profiles.yaml`; the
+  only installed copy is `dome_vision_ros`'s. **Open question for TF01.9** —
+  point the launch default at that, or vendor a copy in `dome_viz`.
+- `package.xml` gained `ament_index_python` (for the installed `static/`) and
+  a `geometry_msgs` test dep.
 
 **Description**: `bridge_node.py` (ROS adapter):
 

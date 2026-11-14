@@ -35,6 +35,26 @@ The VM already sees the robot's topics: it's where RViz runs.
 robot's topics, check VMware's networking (it must stay bridged, for DDS
 discovery and so other machines can reach the page).
 
+## `caplog` does not work in this workspace
+
+**Found 2026-11-14 (TF01.5).** Pytest's `caplog` fixture captures nothing
+here, for any logger, on any thread. It is not a `dome_viz` bug.
+
+ROS's `launch/logging/__init__.py` calls `logging.setLoggerClass(LaunchLogger)`
+(line 538), and `LaunchLogger.__init__` sets `self.propagate = False`
+(line 528). The `launch_testing` and `launch_testing_ros` pytest plugins are
+auto-loaded in this workspace, so that runs before collection: **every logger
+created afterwards has `propagate = False`**, and no record reaches the root
+logger where `caplog` installs its handler.
+
+The giveaway is a log line appearing under *Captured stderr* with no level or
+logger prefix — that is `logging.lastResort`, which fires only when a record
+finds no handler at all.
+
+**How to apply**: to assert on a log message, attach a handler directly to
+that module's logger (`test_web_server.py`'s `logged_warnings` fixture is the
+pattern). Never assert on `caplog.text`.
+
 ## Web stack: aiohttp and plain canvas
 
 **Decided 2026-11-13 (TF01.0).**

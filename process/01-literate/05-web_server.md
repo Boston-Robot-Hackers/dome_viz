@@ -1,11 +1,9 @@
 ---
-version: "1.0"
+version: "1.1"
 generated: "2026-11-14"
 ---
 
 # web_server: one port for the page and its websocket
-
-> **Untested as of this version.** The module and its tests were written on the robot's Pi, which has no `aiohttp`. They have not been run.
 
 `web_server` serves the page's files and a single websocket, using `aiohttp`. It knows nothing about ROS or about what the messages mean. The bridge gives it two callbacks and pushes messages to it.
 
@@ -74,4 +72,5 @@ Anything else a page sends is **logged as a warning and ignored**, not acted on.
 - **Queues are unbounded.** A page that stops reading without closing would grow its queue until the heartbeat (10 s) drops it. A `maxsize` with drop-oldest would bound memory, especially for camera frames.
 - **A bind failure leaves the runner un-cleaned** before the loop closes. Harmless when the process then exits, but worth a `cleanup()` if the server is ever restarted in-process.
 - **Snapshot timing**: a delta computed just before a snapshot but scheduled after it can reach a new page twice. For trails and graphs that is a duplicate point, invisible on screen; for anything stateful it would matter.
-- **`on_connect` and `on_camera_change` run on the server thread**. The bridge's lock and its subscription changes must be safe from there.
+- **`on_connect` and `on_camera_change` run on the server thread**. The bridge answers this with a lock around every `ViewState` call, and by *deferring* subscription changes to its own timer rather than touching `rclpy` from here — see `06-bridge_node.md`.
+- **One test had to stop using `caplog`.** Pytest's log capture sees nothing in this workspace: ROS's `launch.logging` installs a logger class with `propagate = False`, so records never reach the root handler. The test attaches a handler directly to the module's logger instead.

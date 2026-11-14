@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # test_floor_plan — occupancy grid cleanup and steady wall segments
 # Author: Pito Salas and Claude Code
-# Version: 1
+# Version: 2
 # Created: 2026-11-14
 # Updated: 2026-11-14
 # Open Source Under MIT license
@@ -53,8 +53,8 @@ def draw(percent: np.ndarray, start_xy_m, end_xy_m) -> None:
 def load_pgm_map(name: str) -> OccupancyData:
     """A map_saver .pgm + .yaml (trinary) as OccupancyGrid data."""
     meta = yaml.safe_load((FIXTURES / f"{name}.yaml").read_text())
-    _, width, height, _, pixels = (FIXTURES / f"{name}.pgm").read_bytes().split(
-        maxsplit=4
+    _, width, height, _, pixels = (
+        (FIXTURES / f"{name}.pgm").read_bytes().split(maxsplit=4)
     )
     shape = (int(height), int(width))
     darkness = (255 - np.frombuffer(pixels, np.uint8).reshape(shape)) / 255.0
