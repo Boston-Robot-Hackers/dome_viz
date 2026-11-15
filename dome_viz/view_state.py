@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # view_state — robot data in, the page's JSON messages out
 # Author: Pito Salas and Claude Code
-# Version: 2
+# Version: 3
 # Created: 2026-11-14
 # Updated: 2026-11-15
 # Open Source Under MIT license
@@ -71,10 +71,16 @@ class ScanData:
 def name_and_id(label: str, target_id: str, profiles: dict) -> tuple:
     """("soda can", "CN1"), as dome_semantic labels the camera image.
 
-    No profile: the raw label, and its first two letters upper-cased as prefix.
+    `profiles` must be keyed by the **detector label** the robot publishes
+    ("can"), not by `canonical_class` ("soda can") — the bridge joins the two
+    through each profile's `detector_labels`.
+
+    A profile's name is its `display_name`, or its `canonical_class` when it
+    has none, since the canonical class is already the readable form. With no
+    profile at all: the raw label, and its first two letters as the prefix.
     """
     profile = profiles.get(label)
-    name = (profile.display_name if profile else None) or label
+    name = (profile.display_name or profile.canonical_class) if profile else label
     prefix = profile.abbrev if profile and profile.abbrev else label[:2].upper()
     return name, f"{prefix}{target_id}"
 

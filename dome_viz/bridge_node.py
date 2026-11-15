@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # bridge_node — ROS adapter that feeds the dome_viz web page
 # Author: Pito Salas and Claude Code
-# Version: 3
+# Version: 4
 # Created: 2026-11-14
 # Updated: 2026-11-15
 # Open Source Under MIT license
@@ -35,8 +35,11 @@ import threading
 from pathlib import Path
 
 import rclpy
-from ament_index_python.packages import get_package_share_directory
-from dome_semantic.class_profiles import load_class_profiles
+from ament_index_python.packages import (
+    PackageNotFoundError,
+    get_package_share_directory,
+)
+from dome_semantic.class_profiles import build_label_map, load_class_profiles
 from dome_semantic_msgs.msg import SemanticTargetArray
 from dome_telemetry_msgs.msg import BatteryStats
 from nav_msgs.msg import OccupancyGrid, Odometry
@@ -74,6 +77,27 @@ MAP_QOS = QoSProfile(
     reliability=QoSReliabilityPolicy.RELIABLE,
     durability=QoSDurabilityPolicy.TRANSIENT_LOCAL,
 )
+
+# The robot's own vision config is the authority on class names and
+# abbreviations, so the viewer reads the same file rather than keeping a copy
+# that would drift from what the camera image is labelled with.
+PROFILE_PACKAGE = "dome_vision_ros"
+PROFILE_RELATIVE = "config/class_profiles.yaml"
+
+
+def default_profile_path() -> str:
+    """The installed class profiles, or "" when that package is not here.
+
+    Labels are optional: with no profiles a target still shows its raw label,
+    which is `name_and_id`'s designed fallback, so a viewer on a machine
+    without the vision package keeps working.
+    """
+    try:
+        share = get_package_share_directory(PROFILE_PACKAGE)
+    except PackageNotFoundError:
+        return ""
+    path = Path(share) / PROFILE_RELATIVE
+    return str(path) if path.is_file() else ""
 
 
 def yaw_of(quaternion) -> float:
@@ -136,7 +160,9 @@ class BridgeNode(Node):
         super().__init__("dome_viz_bridge")
         host = self.declare_parameter("host", "0.0.0.0").value
         port = self.declare_parameter("port", 8080).value
-        profile_path = self.declare_parameter("class_profile_path", "").value
+        profile_path = self.declare_parameter(
+            "class_profile_path", default_profile_path()
+        ).value
 
         self.lock = threading.Lock()
         self.view = ViewState(self.profiles(profile_path))
@@ -159,10 +185,23 @@ class BridgeNode(Node):
         self.get_logger().info(f"page at http://{host}:{port}/")
 
     def profiles(self, path: str) -> dict:
+        """Class profiles keyed by the detector label the robot publishes.
+
+        `load_class_profiles` keys them by `canonical_class` ("soda can"),
+        while `/semantic/targets` carries the detector label ("can"), so the
+        two are joined through each profile's `detector_labels`.
+        """
         if not path:
-            self.get_logger().info("no class_profile_path: targets show raw labels")
+            self.get_logger().warning(
+                f"no class profiles found: looked for {PROFILE_PACKAGE}'s "
+                f"{PROFILE_RELATIVE}; targets will show raw labels"
+            )
             return {}
-        return load_class_profiles(path)
+        by_canonical = load_class_profiles(path)
+        label_map = build_label_map(by_canonical)
+        return {
+            label: by_canonical[canonical] for label, canonical in label_map.items()
+        }
 
     def subscribe(self) -> None:
         self.create_subscription(OccupancyGrid, "/map", self.take_map, MAP_QOS)

@@ -53,6 +53,7 @@ Why this rule:
 The `SemanticTarget` message carries a class label and an ID but no display name and no lost flag. `view_state` adds both.
 
 - **Names** come from `dome_semantic`'s class profiles: "soda can · CN1". `name_and_id` copies `dome_semantic`'s `short_label` rule (abbrev plus ID, or the first two letters upper-cased), because the original lives in a module that imports `rclpy`.
+- **The profiles must be keyed by the detector label**, and getting this wrong made the whole mechanism a no-op for a day. `load_class_profiles` keys by `canonical_class` — `"soda can"` — while `/semantic/targets` publishes the *detector* label — `"can"`. So `profiles.get(label)` missed every time and every target fell back to its raw label, with nothing to show that anything was wrong. The bridge now joins the two through each profile's `detector_labels`, exactly as `dome_semantic`'s own `build_label_map` does. The lesson is that a lookup whose miss is a *legitimate* fallback cannot report its own failure; only real data showed it.
 - **The raw `label` goes out as well as the display name** (added TF01.8). The page chooses each object's icon and colour from the *class*, not from the words shown to the reader, and "soda can" cannot be mapped back to `can` reliably. Sending both costs a few bytes and keeps the decision where the knowledge is.
 - **Lost** means `last_seen` is more than 5 s old, matching `dome_semantic`'s own `lost_timeout_s`. Lost targets are sent, not dropped; the page fades them.
 

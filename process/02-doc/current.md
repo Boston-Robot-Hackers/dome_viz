@@ -104,12 +104,17 @@ Two things seen live, neither a `dome_viz` fault:
   `map -> odom` is still missing while `/map` publishes, that is a robot-side
   SLAM problem to file against `dome_nav`, not against `dome_viz`.
 
-**One open decision, now due before TF01.12's demo.** `bridge_node`'s `class_profile_path`
-parameter defaults to `""`, which makes targets show a raw label and a
-two-letter prefix (`CA7`) instead of "soda can · CN1". `dome_semantic` does
-not install its `class_profiles.yaml` — the only installed copy belongs to
-`dome_vision_ros`. Either point the launch default at that package's share
-directory (and add the dependency), or vendor a copy in `dome_viz`.
+**Target labels work as of 2026-11-15**, and the "which profile path"
+decision turned out to be the wrong question: the lookup itself was broken.
+`class_profile_path` now defaults to `dome_vision_ros`'s installed
+`class_profiles.yaml` — the robot's own vision config, so the viewer cannot
+drift from the labels on the camera image — and the bridge joins the
+published detector label (`can`) to the profile keyed by `canonical_class`
+(`soda can`) through `detector_labels`. Proven against `f36run6`:
+`soda can · CN1`, `coffee cup · CP23`. See `chores.md`.
+
+If `dome_vision_ros` is ever absent, the warning says so and targets fall
+back to their raw labels, which is `name_and_id`'s designed behaviour.
 
 ### Working on the VM
 

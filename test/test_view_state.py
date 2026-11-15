@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # test_view_state — labels, lost targets, status, run start, laser, floor plan
 # Author: Pito Salas and Claude Code
-# Version: 2
+# Version: 3
 # Created: 2026-11-14
 # Updated: 2026-11-15
 # Open Source Under MIT license
@@ -10,7 +10,7 @@ import base64
 import math
 
 import pytest
-from dome_semantic.class_profiles import parse_class_profiles
+from dome_semantic.class_profiles import TargetClassProfile, parse_class_profiles
 
 from dome_viz.floor_plan import OccupancyData
 from dome_viz.run_history import Pose2D
@@ -54,6 +54,25 @@ def test_label_with_profile_uses_display_name_and_abbrev():
 
 def test_label_with_no_profile_falls_back_to_raw_label():
     assert name_and_id("bottle", "4", PROFILES) == ("bottle", "BO4")
+
+
+def test_a_profile_with_no_display_name_uses_its_canonical_class():
+    """The robot's real `class_profiles.yaml` sets no `display_name`.
+
+    It carries `canonical_class: soda can` with `detector_labels: ["can"]`,
+    and `/semantic/targets` publishes the detector label, so the readable name
+    has to come from the canonical class.
+    """
+    profile = TargetClassProfile(
+        canonical_class="soda can",
+        abbrev="CN",
+        detector_labels=["can"],
+        height_range_m=(0.115, 0.130),
+        diameter_range_m=(0.060, 0.068),
+        aspect_ratio_range=(1.7, 2.1),
+        max_stationary_speed_mps=0.02,
+    )
+    assert name_and_id("can", "1", {"can": profile}) == ("soda can", "CN1")
 
 
 @pytest.mark.parametrize(

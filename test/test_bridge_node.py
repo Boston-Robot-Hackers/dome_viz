@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # test_bridge_node — topic callbacks, TF-less pose, camera subscription life
 # Author: Pito Salas and Claude Code
-# Version: 3
+# Version: 4
 # Created: 2026-11-14
 # Updated: 2026-11-15
 # Open Source Under MIT license
@@ -13,6 +13,7 @@ message, which is also how the pose timer is driven.
 """
 
 import math
+from pathlib import Path
 
 import pytest
 import rclpy
@@ -135,12 +136,27 @@ def test_map_becomes_a_floor_plan(node):
 
 
 def test_targets_become_a_targets_message(node):
+    """Profiles are emptied first, so this does not depend on which packages
+    are installed; the labelled case is covered by `test_view_state` and
+    `test_end_to_end`."""
+    node.view.profiles = {}
     node.take_targets(a_target())
     entry = only(node.server, "targets")["targets"][0]
     assert entry["name"] == "can"
     assert entry["id"] == "CA7"
+    assert entry["label"] == "can"
     assert (entry["x"], entry["y"]) == (1.5, -0.5)
     assert entry["observations"] == 4
+
+
+def test_targets_are_labelled_from_the_installed_profiles(node):
+    """End of the chain the lookup fix was for: a published `can` reads as
+    "soda can · CN7" when the robot's profiles are available."""
+    if not bridge_node.default_profile_path():
+        pytest.skip("dome_vision_ros is not installed here")
+    node.take_targets(a_target())
+    entry = only(node.server, "targets")["targets"][0]
+    assert (entry["name"], entry["id"]) == ("soda can", "CN7")
 
 
 def battery_stats(percent: float, power_w: float) -> BatteryStats:
@@ -241,6 +257,38 @@ def test_yaw_of_a_quarter_turn(node):
     node.tf_buffer.set_transform(turned, "test")
     node.push_pose()
     assert only(node.server, "robot")["yaw"] == pytest.approx(math.pi / 2, abs=1e-3)
+
+
+def test_profiles_are_keyed_by_the_label_the_robot_publishes(node, tmp_path):
+    """The yaml keys by canonical_class; /semantic/targets sends the detector
+    label, so `profiles` must join them through `detector_labels`."""
+    path = tmp_path / "class_profiles.yaml"
+    path.write_text(
+        "class_profiles:\n"
+        "  - canonical_class: soda can\n"
+        "    abbrev: CN\n"
+        '    detector_labels: ["can", "tin"]\n'
+        "    height_range_m: [0.115, 0.130]\n"
+        "    diameter_range_m: [0.060, 0.068]\n"
+        "    aspect_ratio_range: [1.7, 2.1]\n"
+        "    max_stationary_speed_mps: 0.02\n"
+    )
+    profiles = node.profiles(str(path))
+    assert sorted(profiles) == ["can", "tin"]
+    assert profiles["can"].canonical_class == "soda can"
+    assert profiles["can"].abbrev == "CN"
+
+
+def test_no_profile_path_gives_empty_profiles(node):
+    assert node.profiles("") == {}
+
+
+def test_the_robots_installed_profiles_are_found_by_default():
+    """Not a mock: the real file, so a rename on the vision side shows up."""
+    path = bridge_node.default_profile_path()
+    if path:
+        assert path.endswith("config/class_profiles.yaml")
+        assert Path(path).is_file()
 
 
 def test_a_stale_transform_is_treated_as_absent(node):

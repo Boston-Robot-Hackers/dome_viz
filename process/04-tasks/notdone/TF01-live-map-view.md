@@ -212,11 +212,10 @@ both get the broadcast.
   `if messages` guard in `feed` is the whole of it.
 - **`feed(method, *args)`** holds the lock, appends `now_s` and broadcasts,
   so the six callbacks don't repeat that body.
-- **Labels need a path**: new parameter `class_profile_path`, default `""`
-  (empty profiles, so targets fall back to the raw label and a two-letter
-  prefix). `dome_semantic` does not install its `class_profiles.yaml`; the
-  only installed copy is `dome_vision_ros`'s. **Open question for TF01.9** —
-  point the launch default at that, or vendor a copy in `dome_viz`.
+- **Labels need a path**: parameter `class_profile_path`, defaulting to
+  `dome_vision_ros`'s installed `class_profiles.yaml`. **Resolved
+  2026-11-15** — and the lookup was broken as well as unconfigured; see
+  `chores.md`.
 - `package.xml` gained `ament_index_python` (for the installed `static/`) and
   a `geometry_msgs` test dep.
 - **Amended 2026-11-15 for I01**: `lookup` now rejects any transform older
