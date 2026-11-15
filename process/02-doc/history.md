@@ -54,7 +54,43 @@
   run ticker all worked. It exposed **I01**: a dead robot still reports
   "live" at a frozen pose, because `Time()` TF lookups keep succeeding from a
   stale buffer and the pose timer then refreshes its own liveness.
-- **Replay bags copied to the VM's `~/.dome/bags/`** (`viz01` 172 MB with
+- **Replay bags copied to the VM's `~/.dome/bags/`** (see below)
+
+## 2026-11-15
+
+- **I01 fixed and closed**: `bridge_node.lookup` rejects any transform older
+  than `TF_STALE_S` (2 s), because a `tf2` buffer only prunes as new
+  transforms arrive, so a dead publisher's last one was returned for ever.
+  `ViewState` needed no change — with no pose message, every source falls
+  quiet and `QUIET_S` reaches `not_connected` unaided. Verified against a
+  publisher that genuinely dies: robot undrawn after 2 s, `not_connected`
+  after 7 s.
+- **TF01.7 done**: the page's manual browser test passed on all eight steps,
+  against live robot data and `viz01`. Laser rays darkened at the user's
+  request (a chore).
+- **TF01.8 done as far as `viz01` can show it**: `static/panels.js` — object
+  markers, objects list and detail, camera panel, status line with
+  per-source details, offline banner, and the four run graphs. The user
+  approved the page. **The objects half is unverified**, because `viz01`
+  carries no `/semantic/targets`. `view_state` gained one field, the raw
+  `label`, which the page needs for each object's icon and colour.
+  **The camera round-trip is proven**: 2373 JPEG frames after a toggle.
+- **TF01.9 done**: `launch/view.launch.py`, `make view`, `make replay`.
+  **Rewritten to use `better_launch`** after the user pointed out that every
+  DOME package launches with `bl` — which also removed all the substitution
+  handling, and moved `page_urls` into the package because a `better_launch`
+  launchfile runs at import time and so cannot be unit tested.
+- **TF01.10 done**: `viz01` confirmed to carry `/map` and the camera; record
+  and replay commands written into `notes.md`.
+- **TF01.11 done**: 87 tests, `ruff` clean, including an end-to-end test that
+  drives the real bridge and real web server and asserts over a websocket.
+- **I02 filed** (open): a backwards `/clock` makes source ages negative, and
+  a wrong clock now hides the robot entirely — the second half being a
+  consequence of I01's fix that fails silently.
+- **F02 filed** (not approved): square up the map so the walls run
+  horizontal and vertical. The angle already exists in
+  `FloorPlanner.angle_rad`. The user chose to have the grid rotate with the
+  map; `layout.md` amended. (`viz01` 172 MB with
   `/map` and the camera, `f36run6` 30 MB). Transfers first failed with
   `Received message too long`: the Pi's `~/.bashrc` printed on
   non-interactive sessions, which breaks `rsync`, `scp` and `sftp` alike.

@@ -1,15 +1,16 @@
 ---
-version: "1.0"
-generated: "2026-11-14"
+version: "1.1"
+generated: "2026-11-15"
 ---
 
 # Appendix: the package skeleton
 
 These files make `dome_viz` an installable ROS 2 `ament_python` package. There is little logic in them, but a few choices matter.
 
-## `bridge_node.py`, still a skeleton
+## `bridge_node.py`'s entry point
 
-For now the node does nothing but exist, so `colcon build`, the entry point and the import test all work. TF01.6 fills it in: subscriptions, TF lookups, a lock around `ViewState`, and the web server.
+The node itself is now the subject of `06-bridge_node.md`; what belongs here is
+only its `main`, which is the package's one console script.
 
 ```python
 try:

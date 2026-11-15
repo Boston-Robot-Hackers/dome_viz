@@ -17,6 +17,7 @@
   <depend>tf2_ros</depend>
   <depend>dome_semantic_msgs</depend>
   <depend>dome_telemetry_msgs</depend>
+  <exec_depend>better_launch</exec_depend>
   <exec_depend>dome_semantic</exec_depend>
   <exec_depend>python3-aiohttp</exec_depend>
   <exec_depend>python3-numpy</exec_depend>

@@ -11,6 +11,11 @@ help: ## List targets
 	@awk 'BEGIN {FS = ":.*## "} \
 		/^[a-zA-Z_-]+:.*## / {printf "  %-10s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Add user-facing targets here as features land, each with a `## description`:
-#   validate: ## Check a card
-#   	uv run <app> check
+.PHONY: view replay
+
+view: ## Open the live map view (prints the URLs to open)
+	bl dome_viz view.launch.py
+
+replay: ## Open the view against a recorded bag: make replay BAG=~/.dome/bags/viz01
+	bl dome_viz view.launch.py --use_sim_time True & \
+	sleep 4 && ros2 bag play $(BAG) --clock; kill %1

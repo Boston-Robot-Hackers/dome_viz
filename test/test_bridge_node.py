@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # test_bridge_node — topic callbacks, TF-less pose, camera subscription life
 # Author: Pito Salas and Claude Code
-# Version: 2
+# Version: 3
 # Created: 2026-11-14
-# Updated: 2026-11-14
+# Updated: 2026-11-15
 # Open Source Under MIT license
 """The bridge with a fake web server in place of the real one.
 
@@ -20,10 +20,11 @@ from dome_semantic_msgs.msg import SemanticTarget, SemanticTargetArray
 from dome_telemetry_msgs.msg import BatteryStats
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import OccupancyGrid, Odometry
+from rclpy.duration import Duration
 from sensor_msgs.msg import CompressedImage, LaserScan
 
 from dome_viz import bridge_node
-from dome_viz.bridge_node import CAMERA_TOPIC, BridgeNode
+from dome_viz.bridge_node import CAMERA_TOPIC, TF_STALE_S, BridgeNode
 
 
 class FakeServer:
@@ -97,21 +98,31 @@ def a_target(label: str = "can", target_id: str = "7") -> SemanticTargetArray:
     return array
 
 
-def a_transform(parent: str, child: str, x_m: float, y_m: float) -> TransformStamped:
+def a_transform(
+    parent: str, child: str, x_m: float, y_m: float, stamp
+) -> TransformStamped:
     transform = TransformStamped()
     transform.header.frame_id = parent
     transform.child_frame_id = child
+    transform.header.stamp = stamp
     transform.transform.translation.x = x_m
     transform.transform.translation.y = y_m
     transform.transform.rotation.w = 1.0
     return transform
 
 
-def place_robot(node: BridgeNode, x_m: float = 2.0, y_m: float = 1.0) -> None:
-    """Static `map -> odom -> base_footprint`, so a pose lookup succeeds."""
-    node.tf_buffer.set_transform_static(a_transform("map", "odom", 0.0, 0.0), "test")
-    node.tf_buffer.set_transform_static(
-        a_transform("odom", "base_footprint", x_m, y_m), "test"
+def place_robot(
+    node: BridgeNode, x_m: float = 2.0, y_m: float = 1.0, age_s: float = 0.0
+) -> None:
+    """A `map -> odom -> base_footprint` chain, stamped `age_s` ago.
+
+    Dynamic transforms rather than static ones, because `lookup` judges a
+    transform by its stamp and a static transform carries no useful one.
+    """
+    stamp = (node.get_clock().now() - Duration(seconds=age_s)).to_msg()
+    node.tf_buffer.set_transform(a_transform("map", "odom", 0.0, 0.0, stamp), "test")
+    node.tf_buffer.set_transform(
+        a_transform("odom", "base_footprint", x_m, y_m, stamp), "test"
     )
 
 
@@ -222,9 +233,33 @@ def test_tick_reports_status(node):
 
 def test_yaw_of_a_quarter_turn(node):
     place_robot(node)
-    turned = a_transform("odom", "base_footprint", 0.0, 0.0)
+    turned = a_transform(
+        "odom", "base_footprint", 0.0, 0.0, node.get_clock().now().to_msg()
+    )
     turned.transform.rotation.z = math.sin(math.pi / 4)
     turned.transform.rotation.w = math.cos(math.pi / 4)
-    node.tf_buffer.set_transform_static(turned, "test")
+    node.tf_buffer.set_transform(turned, "test")
     node.push_pose()
     assert only(node.server, "robot")["yaw"] == pytest.approx(math.pi / 2, abs=1e-3)
+
+
+def test_a_stale_transform_is_treated_as_absent(node):
+    """I01: a dead publisher's last transform is not the pose now.
+
+    A `tf2` buffer keeps returning it, so the bridge used to draw a gone robot
+    motionless but reported as live.
+    """
+    place_robot(node, age_s=TF_STALE_S + 3.0)
+    node.push_pose()
+    assert node.server.messages == []
+
+
+def test_a_stale_pose_leaves_the_state_disconnected(node):
+    """The whole point of rejecting stale TF: the page must say so."""
+    place_robot(node, age_s=TF_STALE_S + 3.0)
+    for _ in range(5):
+        node.push_pose()
+    node.push_tick()
+    status = only(node.server, "status")
+    assert status["ages_s"]["pose"] is None
+    assert status["state"] == "not_connected"

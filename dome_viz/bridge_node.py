@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # bridge_node — ROS adapter that feeds the dome_viz web page
 # Author: Pito Salas and Claude Code
-# Version: 2
+# Version: 3
 # Created: 2026-11-14
-# Updated: 2026-11-14
+# Updated: 2026-11-15
 # Open Source Under MIT license
 """ROS 2 node that turns the robot's topics into messages for the web page.
 
@@ -17,7 +17,9 @@ thread the moment a page opens.
   opened late still receives the current map.
 - The robot pose is a TF lookup on a timer rather than a topic:
   `odom -> ROBOT_FRAME` for the trail, which is kept in `odom`, and
-  `map -> odom` to place it. A lookup that fails is skipped, never guessed at.
+  `map -> odom` to place it. A lookup that fails, **or that answers only with
+  a transform older than TF_STALE_S**, is skipped rather than guessed at — see
+  `lookup`.
 - **The camera costs the Pi nothing while nobody watches it.** The
   subscription exists only while some page has the panel on. The server's
   callback merely records the wish; `reconcile_camera` on the pose timer
@@ -62,6 +64,10 @@ ROBOT_FRAME = "base_footprint"
 CAMERA_TOPIC = "/oak/image_annotated_compressed"
 POSE_PERIOD_S = 0.1
 TICK_PERIOD_S = 1.0
+# Generous against slam_toolbox's 20 Hz map -> odom (dome_nav's
+# transform_publish_period is 0.05 s), tight enough that a gone robot stops
+# being drawn well before QUIET_S makes the page say so.
+TF_STALE_S = 2.0
 
 MAP_QOS = QoSProfile(
     depth=1,
@@ -183,11 +189,22 @@ class BridgeNode(Node):
             self.server.broadcast(messages)
 
     def lookup(self, parent: str, child: str, when: Time) -> Pose2D | None:
-        """`child`'s pose in `parent`, or None when TF cannot answer yet."""
+        """`child`'s pose in `parent`, or None when TF has no fresh answer.
+
+        A `tf2` buffer only discards old transforms as new ones are inserted,
+        so once a publisher stops, its last transform keeps being returned for
+        ever. Anything older than TF_STALE_S is therefore treated as absent:
+        a dead publisher's final transform is not where the robot is now, and
+        returning it would draw a motionless robot as though it were live.
+        """
         try:
             transform = self.tf_buffer.lookup_transform(parent, child, when)
         except TransformException as error:
             self.get_logger().debug(f"no transform {parent} -> {child}: {error}")
+            return None
+        age_s = self.now_s() - stamp_s(transform.header.stamp)
+        if age_s > TF_STALE_S:
+            self.get_logger().debug(f"{parent} -> {child} is {age_s:.1f} s stale")
             return None
         return pose2d_of(transform.transform)
 

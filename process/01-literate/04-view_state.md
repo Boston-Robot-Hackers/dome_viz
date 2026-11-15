@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-11-14"
+version: "1.1"
+generated: "2026-11-15"
 ---
 
 # view_state: everything the page shows, as JSON messages
@@ -53,6 +53,7 @@ Why this rule:
 The `SemanticTarget` message carries a class label and an ID but no display name and no lost flag. `view_state` adds both.
 
 - **Names** come from `dome_semantic`'s class profiles: "soda can · CN1". `name_and_id` copies `dome_semantic`'s `short_label` rule (abbrev plus ID, or the first two letters upper-cased), because the original lives in a module that imports `rclpy`.
+- **The raw `label` goes out as well as the display name** (added TF01.8). The page chooses each object's icon and colour from the *class*, not from the words shown to the reader, and "soda can" cannot be mapped back to `can` reliably. Sending both costs a few bytes and keeps the decision where the knowledge is.
 - **Lost** means `last_seen` is more than 5 s old, matching `dome_semantic`'s own `lost_timeout_s`. Lost targets are sent, not dropped; the page fades them.
 
 ## Status: one sentence for people

@@ -15,6 +15,76 @@ image, is subscribed only while the user is looking at it. `dome_vision` only
 publishes images when someone subscribes, so an unsubscribed topic costs the Pi
 nothing.
 
+## Launchfiles use `better_launch`
+
+**Decided 2026-11-15 (user's correction).** Every DOME package launches
+through **`better_launch`**, not ROS 2's own launch system — `bl dome_viz
+view.launch.py`, matching `bl dome2 robot.launch.py` and the rest. The first
+version of `view.launch.py` used `LaunchDescription` and
+`DeclareLaunchArgument`; it was rewritten.
+
+**How to apply**: a launchfile is a `@launch_this`-decorated function whose
+typed parameters *are* the launch arguments, with a numpydoc docstring whose
+`Parameters` section becomes their help text. Arguments arrive as real
+values, so no substitutions:
+
+```python
+@launch_this
+def view(use_sim_time: bool = False, host: str = "0.0.0.0", port: int = 8080):
+    bl = BetterLaunch()
+    bl.node("dome_viz", "bridge_node", "dome_viz_bridge",
+            params={"host": host, "port": port}, use_sim_time=use_sim_time)
+```
+
+On the command line the arguments are `--port 8094`, not `port:=8094`.
+
+**A launchfile cannot be imported, so it cannot be unit tested.**
+`@launch_this` runs the decorated function at *decoration* time, so importing
+`view.launch.py` starts the node. Keep anything worth testing in the package
+— `dome_viz/page_urls.py` exists for exactly that — and let the launchfile
+stay thin. `test_launch.py` checks the arguments by parsing the file with
+`ast`.
+
+## Recording and replaying a bag for the viewer
+
+**TF01.10, 2026-11-15.** `~/.dome/bags/viz01` is the bag the viewer is
+developed against. Verified with `ros2 bag info`: 171 MiB, 446 s, with
+**`/map` (45) and `/oak/image_annotated_compressed` (4388)** — the two topics
+the older F36 bags lack.
+
+**To record another**, on the robot, with its stack already running:
+
+```
+ros2 bag record -o ~/bags/<name> \
+  /map /tf /tf_static /odom /scan \
+  /semantic/targets /oak/detections_3d /oak/image_annotated_compressed \
+  /telemetry/battery
+```
+
+`/map` is latched (transient local), so it arrives at the start and then only
+on each SLAM update — `map_update_interval` is 10 s on this robot, hence only
+45 messages in a 7-minute run. Include `/telemetry/battery` once the robot
+publishes it again; `viz01` has no battery data because the topic was
+disabled when it was recorded.
+
+**To replay it** into the viewer, from the VM:
+
+```
+bl dome_viz view.launch.py --use_sim_time True
+ros2 bag play ~/.dome/bags/viz01 --clock
+```
+
+Or `make replay BAG=~/.dome/bags/viz01`.
+
+**`--clock` and `use_sim_time:=true` go together.** Without `--clock` nothing
+publishes `/clock`, so a node on sim time has a frozen clock; without
+`use_sim_time` the node is on wall time while the transforms carry the bag's
+stamps, every transform looks days old, and `bridge_node` rejects them all as
+stale and draws no robot (see issue I02).
+
+**Never replay two bags at once**, and restart the viewer between replays:
+`/clock` then jumps backwards, which makes source ages negative (I02).
+
 ## Bags for replay need `/map` and the image
 
 The `dome_semantic` F36 bags (e.g. `~/bags/f36run6`) record `/tf`,

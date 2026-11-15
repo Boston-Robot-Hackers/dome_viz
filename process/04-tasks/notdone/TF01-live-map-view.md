@@ -219,6 +219,11 @@ both get the broadcast.
   point the launch default at that, or vendor a copy in `dome_viz`.
 - `package.xml` gained `ament_index_python` (for the installed `static/`) and
   a `geometry_msgs` test dep.
+- **Amended 2026-11-15 for I01**: `lookup` now rejects any transform older
+  than `TF_STALE_S` (2.0 s). A `tf2` buffer only prunes as new transforms
+  arrive, so after a publisher dies its last one was returned for ever — the
+  first live run drew a motionless robot and reported it as "live". Two
+  regression tests; 76 pass. See `process/05-issues/closed/I01-*`.
 
 **Description**: `bridge_node.py` (ROS adapter):
 
@@ -241,8 +246,15 @@ and the last "camera off". A pose push is skipped when TF has no transform.
 
 ## TF01.7 — Page: floor plan, robot, pan and zoom
 
-**Status**: code written 2026-11-14, **manual browser test pending** — see
-"TF01.7 manual test" in `current.md`.
+**Status**: done 2026-11-15 — **manual browser test passed**, all eight
+steps, against live robot data and `viz01` replay. The user's words: "it all
+looks good". Floor plan the right way up and unmirrored, grid and origin,
+robot to scale with heading and trail, pan/zoom/Fit/Follow, scale bar, laser
+toggle, run ticker, and both themes.
+
+Two follow-ups from the user at the same time: the laser rays were too faint
+(chore, done — `globalAlpha` 0.13 → 0.22), and the map should be drawn with
+the walls squared up, which became **F02**.
 
 `static/index.html`, `static/app.css`, `static/app.js` (654 lines in all),
 ported from the approved mockup. Verified end to end against
@@ -287,7 +299,43 @@ result in `current.md`. A JS test toolchain isn't worth adding for this.
 
 ## TF01.8 — Page: objects, camera, status
 
-**Status**: not done
+**Status**: done 2026-11-15 for everything `viz01` can show — **the user
+checked the page against a live `viz01` replay and approved it** ("it looks
+good"). **The objects half is still unverified**, see below.
+
+**Not verified, and could not be**: the object markers, the objects list, the
+detail block, selection and the lost-object styling. `viz01` carries no
+`/semantic/targets`, so the list was necessarily empty on screen. To finish
+this off, replay `f36run6` (630 target messages, but no `/map`, so no floor
+plan) or run `dome_semantic` against the `viz01` replay. Worth doing before
+TF01.12's demo, since the objects list is half the point of the feature.
+
+`static/panels.js` (416 lines) plus the sidebar in `index.html` and its
+styles. It owns the object markers, the objects list and detail block, the
+camera panel, the status line with its per-source details and the offline
+banner, and the four "this run" graphs.
+
+- **The run graphs landed here.** Neither TF01.7 nor TF01.8 named them, but
+  `layout.md` has them under "This run" and TF01.1 added them to the approved
+  mockup, so they would otherwise have fallen through the gap.
+- **`view_state.py` gained one field**: a target entry now carries its raw
+  `label`, because the page picks each object's icon and colour from the class
+  and the message only had the display name. TF01.1 anticipated exactly this
+  ("adjust TF01.4's messages if the layout needs fields they don't carry").
+- **A documented seam, not a module system**: `app.js` keeps the map canvas,
+  the view transform, the websocket and the controls, and exposes
+  `window.domeViz`; `panels.js` owns the DOM. Classic scripts rather than ES
+  modules, because module loading is the one thing that cannot be checked
+  without a browser.
+- **The panels re-render per message type**, not on every message: a 10 Hz
+  pose push used to rebuild the status line and redraw four graphs.
+- **Verified end to end against `viz01`**: all four assets serve, and one
+  websocket client saw 25 `floor_plan`, 881 `targets`, 12 `run`, 881 `status`
+  and — after sending `{"type": "camera", "is_on": true}` — **2373 JPEG
+  frames**, which proves the camera round-trip and TF01.6's subscription
+  lifecycle. Series keys are exactly `battery_pct`, `power_w`, `speed_mps`,
+  `objects`.
+- **What is unverified is the rendering**, as with TF01.7.
 
 **Description**: Draw each target as a badge with its icon, display name and
 ID, readable at any zoom; lost targets faded, not hidden. A camera
@@ -299,7 +347,28 @@ A status line that says plainly when a source has gone quiet ("No map yet",
 
 ## TF01.9 — Launch and make target
 
-**Status**: not done
+**Status**: done 2026-11-15 — `launch/view.launch.py`, `make view` and
+`make replay`, with 7 tests in `test/test_launch.py`.
+
+Verified by launching it: `bl dome_viz view.launch.py --port 8094 --host
+127.0.0.1` reached the node, the page served 200, and it logged both URLs —
+`dome_viz: open http://localhost:8094/` and
+`dome_viz: open http://192.168.4.83:8094/`.
+
+- **It uses `better_launch`, not ROS 2 launch** (user's correction; the first
+  version used `LaunchDescription` and `DeclareLaunchArgument`). Every DOME
+  package launches with `bl`, and this one now matches. See `notes.md`,
+  "Launchfiles use `better_launch`".
+- **Arguments are the decorated function's typed parameters**, so they arrive
+  as real values and all the substitution handling disappeared.
+- **`page_urls` moved into the package** (`dome_viz/page_urls.py`): a
+  `better_launch` launchfile runs its function at import time, so nothing in
+  one can be unit tested. The launchfile is now thin, and `test_launch.py`
+  checks the arguments and the `bl.node` call by parsing the file with `ast`.
+- **The LAN address comes from the kernel's own routing**, by asking a
+  connected UDP socket for its local address. No packet is sent, so it works
+  on a LAN with no internet.
+- `package.xml` gained a `better_launch` exec dep.
 
 **Description**: `launch/view.launch.py` starts the bridge (args:
 `use_sim_time`, `host`, `port`) and prints the page URLs: `localhost` and
@@ -311,7 +380,21 @@ the node.
 
 ## TF01.10 — A replay bag with the map and camera
 
-**Status**: not done
+**Status**: done 2026-11-15 — `~/.dome/bags/viz01` (recorded 2026-11-13) is
+the bag, and it is on the VM.
+
+`ros2 bag info` confirms both topics: **`/map` (45) and
+`/oak/image_annotated_compressed` (4388)**, over 446 s. The record and replay
+commands are in `notes.md`, "Recording and replaying a bag for the viewer",
+together with the two traps found while using it — `--clock` and
+`use_sim_time` must go together, and two overlapping replays send `/clock`
+backwards (issue I02).
+
+It carries no `/semantic/targets` (the semantic node started late) and no
+`/telemetry/battery` (disabled on the robot), so the objects list and two of
+the four graphs stay empty under this bag. Running `dome_semantic` against
+the replay regenerates the targets, which is how
+`test/fixtures/viz01replay.json` was made.
 
 **Description**: On the robot, record a short drive with `/map` and
 `/oak/image_annotated_compressed` added to the usual topics
@@ -322,7 +405,29 @@ viewer VM. Write the record and replay commands in `notes.md`.
 
 ## TF01.11 — Test suite
 
-**Status**: not done
+**Status**: done 2026-11-15 — **85 tests pass**, `ruff check` and
+`ruff format --check` clean on `dome_viz/`, `test/`, `launch/` and
+`setup.py`.
+
+The end-to-end test is `test/test_end_to_end.py`: `BridgeNode` with its
+**real** `WebServer` on a free port, fed a fake `/map`, a `SemanticTarget`
+and injected TF, with the assertions made by a real websocket client that
+knows only the wire format. It sees the floor plan, a target labelled "soda
+can · CN3" from its class profile, and the robot pose composed through
+`map -> odom -> base_footprint`. A second case opens a late page and checks
+the snapshot matches, which exercises the lock around `on_connect` on the
+server's thread.
+
+Per-task tests: TF01.2 `test_imports`, TF01.3 `test_floor_plan` and
+`test_wall_fit`, TF01.4 `test_view_state` and `test_run_history`, TF01.5
+`test_web_server`, TF01.6 `test_bridge_node` (including I01's two
+regressions), TF01.9 `test_launch`.
+
+**TF01.7 and TF01.8 have no automated tests by decision** — their test is
+manual in a browser, and a JS toolchain is not worth adding for this. The
+browser-side verification that did prove possible is in the task notes above:
+every asset serves, and a websocket client sees every message type including
+2373 camera frames.
 
 **Description**: Make sure TF01.2–TF01.6 and TF01.9's tests exist and pass,
 plus one end-to-end test: fake `/map`, target and TF messages in, the

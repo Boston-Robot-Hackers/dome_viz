@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # test_view_state — labels, lost targets, status, run start, laser, floor plan
 # Author: Pito Salas and Claude Code
-# Version: 1
+# Version: 2
 # Created: 2026-11-14
-# Updated: 2026-11-14
+# Updated: 2026-11-15
 # Open Source Under MIT license
 
 import base64
@@ -69,6 +69,14 @@ def test_target_entry_carries_age_and_position():
     entry = target_entry(can(100.0), PROFILES, 130.0)
     assert entry["seen_ago_s"] == 30.0
     assert (entry["x"], entry["y"], entry["observations"]) == (1.0, 2.0, 3)
+
+
+def test_target_entry_carries_the_raw_label():
+    """The page picks each object's icon and colour from the class, not the
+    display name, so the raw label has to survive into the message."""
+    entry = target_entry(can(100.0), PROFILES, 100.0)
+    assert entry["label"] == "can"
+    assert (entry["name"], entry["id"]) == ("soda can", "CN1")
 
 
 def test_status_reports_source_never_heard_from():

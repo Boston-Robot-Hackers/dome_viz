@@ -7,6 +7,13 @@
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="ic-can" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="5.5" ry="2"/><path d="M6.5 5v14c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2V5"/><path d="M6.5 9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2"/></g></symbol>
+  <symbol id="ic-cup" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M5 7h11l-1.2 11.2A2 2 0 0 1 12.8 20H8.2a2 2 0 0 1-2-1.8L5 7z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H15.4"/><path d="M8.5 3.5c0 1 1 1 1 2M12 3.5c0 1 1 1 1 2"/></g></symbol>
+  <symbol id="ic-obj" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+</svg>
+
 <div class="app">
   <header class="topbar">
     <div class="brand">
@@ -14,15 +21,15 @@
       <span class="ticker" id="ticker" title="Time since this run started"><span class="k">Run</span><span id="runTime">—</span></span>
     </div>
     <div class="state" id="state" data-state="offline">
-      <span class="dot"></span>
-      <span id="stateText">Connecting…</span>
-      <span class="sub" id="stateSub"></span>
+      <button class="status-line" id="statusLine" aria-expanded="false" aria-controls="statusDetails"></button>
+      <div class="status-details" id="statusDetails" hidden></div>
     </div>
   </header>
 
   <div class="main">
     <div class="stage" id="stage">
       <canvas id="map" aria-label="Floor plan of the area the robot has mapped"></canvas>
+      <div class="markers" id="markers"></div>
 
       <div class="empty" id="empty">
         <div>
@@ -30,6 +37,12 @@
           <h2>Waiting for the map</h2>
           <p>No map has arrived yet. Start SLAM on the robot, or play a bag with <code>--clock</code>.</p>
         </div>
+      </div>
+
+      <div class="banner" id="banner" hidden role="status">
+        <span class="dot"></span>
+        <strong>Robot not connected.</strong>
+        <span id="bannerSub">Showing the last map.</span>
       </div>
 
       <div class="controls">
@@ -46,8 +59,33 @@
         </div>
       </div>
     </div>
+
+    <aside class="sidebar" id="sidebar">
+      <section class="panel" aria-label="Camera">
+        <div class="panel-head">
+          <h2>Camera</h2>
+          <label class="switch" for="camToggle">
+            <input type="checkbox" id="camToggle">
+            <span id="camState">Off</span>
+          </label>
+        </div>
+        <div class="camera-body" id="cameraBody"></div>
+      </section>
+
+      <section class="panel" aria-label="This run">
+        <div class="panel-head"><h2>This run</h2></div>
+        <div class="graphs" id="graphs"></div>
+      </section>
+
+      <section class="panel" aria-label="Objects found">
+        <div class="panel-head"><h2 id="objectsHead">Objects</h2></div>
+        <div class="objects-body" id="objectsBody"></div>
+      </section>
+    </aside>
   </div>
 </div>
+
 <script src="/static/app.js"></script>
+<script src="/static/panels.js"></script>
 </body>
 </html>

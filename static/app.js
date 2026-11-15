@@ -6,8 +6,10 @@
 // repaints are coalesced into one animation frame, so a burst of messages
 // costs a single redraw.
 //
-// Objects, the camera panel, the designed status line and the run graphs are
-// TF01.8; this file deliberately ignores the `targets` and `run` messages.
+// This file owns the map canvas, the view transform, the websocket and the map
+// controls. The DOM panels — objects list, camera, status line, run graphs —
+// and the object markers belong to panels.js, which reaches them through the
+// `window.domeViz` seam defined below.
 (() => {
   const stage = document.getElementById("stage");
   const canvas = document.getElementById("map");
@@ -17,10 +19,26 @@
 
   const state = {
     scale: 80, cx: 0, cy: 0,       // px per metre, view centre in map metres
-    follow: false, showLaser: true,
-    isSocketOpen: false, robotState: "not_connected", runSeconds: null,
+    follow: false, showLaser: true, selected: null,
+    isSocketOpen: false, robotState: "not_connected",
   };
-  const world = { plan: null, robot: null, trail: [], trailMax: 600, laser: null };
+  const world = {
+    plan: null, robot: null, trail: [], trailMax: 2000, laser: null,
+    targets: [], series: {}, runMax: 1800, status: null,
+  };
+
+  // The seam to panels.js, which owns the DOM panels and the map markers.
+  // It replaces `onPanels` (something changed, re-render) and `onCameraFrame`;
+  // `onDraw` runs after every map repaint, so markers follow pan and zoom.
+  const api = {
+    world, state,
+    onPanels: () => {},
+    onDraw: () => {},
+    onCameraFrame: () => {},
+    send: (message) => socket?.readyState === WebSocket.OPEN
+      && socket.send(JSON.stringify(message)),
+  };
+  window.domeViz = api;
 
   // ---- floor raster -------------------------------------------------------
   // Blur the known-space mask, resample it at `px` pixels per cell with bilinear
@@ -158,6 +176,7 @@
       drawGrid(); drawWalls(); drawOrigin(); drawLaser(); drawTrail(); drawRobot();
     }
     drawScale();
+    api.onDraw();
   }
 
   let isDrawPending = false;
@@ -254,7 +273,7 @@
     if (!state.showLaser || isOffline() || !laser?.hits.length) return;
     const color = css("--robot");
     const [lx, ly] = toScreen(laser.origin[0], laser.origin[1]);
-    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = .13;
+    ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.globalAlpha = .22;
     ctx.beginPath();
     for (const [x, y] of laser.hits) {
       const [sx, sy] = toScreen(x, y);
@@ -337,30 +356,6 @@
   }
 
   // ---- messages -----------------------------------------------------------
-  const clock = (seconds) => {
-    const whole = Math.max(0, Math.floor(seconds));
-    return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
-  };
-
-  function showState() {
-    const element = document.getElementById("state");
-    const text = document.getElementById("stateText");
-    if (!state.isSocketOpen) {
-      element.dataset.state = "offline";
-      text.textContent = "Not connected to the viewer";
-      document.getElementById("stateSub").textContent = "";
-      return;
-    }
-    element.dataset.state = state.robotState;
-    text.textContent = {
-      live: "Live",
-      waiting_for_map: "Waiting for the map",
-      not_connected: "Robot not connected",
-    }[state.robotState] ?? state.robotState;
-    document.getElementById("runTime").textContent =
-      state.runSeconds === null ? "—" : clock(state.runSeconds);
-  }
-
   const handlers = {
     floor_plan(message) {
       const isFirst = world.plan === null;
@@ -377,31 +372,47 @@
       }
     },
     laser(message) { world.laser = message; },
+    targets(message) { world.targets = message.targets; },
+    run(message) {
+      world.runMax = message.max_points;
+      for (const [name, points] of Object.entries(message.series)) {
+        const kept = message.is_full ? [] : world.series[name] ?? [];
+        const joined = kept.concat(points);
+        world.series[name] = joined.length > world.runMax
+          ? joined.slice(joined.length - world.runMax)
+          : joined;
+      }
+    },
     status(message) {
+      world.status = message;
       state.robotState = message.state;
-      state.runSeconds = message.run_s;
-      showState();
     },
   };
 
+  let socket = null;
+
   function connect() {
-    const socket = new WebSocket(`ws://${location.host}/ws`);
+    socket = new WebSocket(`ws://${location.host}/ws`);
     socket.binaryType = "arraybuffer";
     socket.addEventListener("open", () => {
       state.isSocketOpen = true;
-      showState();
+      api.onPanels();
     });
     socket.addEventListener("message", (event) => {
-      if (typeof event.data !== "string") return;   // camera frames: TF01.8
+      if (typeof event.data !== "string") {
+        api.onCameraFrame(event.data);
+        return;
+      }
       const message = JSON.parse(event.data);
       const handler = handlers[message.type];
       if (!handler) return;
       handler(message);
+      api.onPanels(message.type);
       requestDraw();
     });
     socket.addEventListener("close", () => {
       state.isSocketOpen = false;
-      showState();
+      api.onPanels();
       setTimeout(connect, 1000);
     });
   }
@@ -463,6 +474,51 @@
     document.getElementById("follow").setAttribute("aria-pressed", isOn);
   }
 
+  // Selecting an object never changes the zoom, and the map pans only when the
+  // object is off-screen (layout.md).
+  let panFrame = null;
+  function bringIntoView(target) {
+    const pad = 56, w = stage.clientWidth, h = stage.clientHeight;
+    const [sx, sy] = toScreen(target.x, target.y);
+    const dx = sx < pad ? sx - pad : sx > w - pad ? sx - (w - pad) : 0;
+    const dy = sy < pad ? sy - pad : sy > h - pad ? sy - (h - pad) : 0;
+    if (!dx && !dy) return;
+    setFollow(false);
+    const from = [state.cx, state.cy];
+    const to = [state.cx + dx / state.scale, state.cy - dy / state.scale];
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      [state.cx, state.cy] = to;
+      return;
+    }
+    const start = performance.now(), span = 350;
+    cancelAnimationFrame(panFrame);
+    const step = (now) => {
+      const part = Math.min(1, (now - start) / span);
+      const eased = 1 - (1 - part) ** 3;
+      state.cx = from[0] + (to[0] - from[0]) * eased;
+      state.cy = from[1] + (to[1] - from[1]) * eased;
+      draw();
+      if (part < 1) panFrame = requestAnimationFrame(step);
+    };
+    panFrame = requestAnimationFrame(step);
+  }
+
+  api.toScreen = toScreen;
+  api.requestDraw = requestDraw;
+  api.select = (id) => {
+    state.selected = state.selected === id ? null : id;
+    const target = world.targets.find((item) => item.id === state.selected);
+    if (target) bringIntoView(target);
+    api.onPanels("targets");
+    requestDraw();
+  };
+
+  stage.addEventListener("click", (event) => {
+    if (state.selected && !event.target.closest(".controls, .marker")) {
+      api.select(state.selected);           // clicking empty map deselects
+    }
+  });
+
   const centre = () => [stage.clientWidth / 2, stage.clientHeight / 2];
   document.getElementById("zoomIn").onclick = () => zoomAt(1.3, ...centre());
   document.getElementById("zoomOut").onclick = () => zoomAt(1 / 1.3, ...centre());
@@ -477,7 +533,6 @@
   window.addEventListener("resize", requestDraw);
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", requestDraw);
 
-  showState();
   draw();
   connect();
 })();

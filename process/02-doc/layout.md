@@ -33,8 +33,12 @@ browser. The mockup itself is the picture; open it to see the layout.
 - **Coordinate grid**: faint lines in the `map` frame every 0.5, 1, 2, 5 or
   10 m depending on zoom, labelled in metres on the top and left edges. The
   x = 0 and y = 0 axes are stronger, in neutral grey (not red and green).
-  The origin is a marked dot labelled **0, 0**, with x pointing right and y
-  pointing up.
+  The origin is a marked dot labelled **0, 0**.
+- **Orientation** (amended 2026-11-15, F02): the view is drawn rotated so the
+  room's main wall direction runs horizontally and vertically, with a **Square
+  up** toggle to return to true `map` orientation. **The grid rotates with the
+  map**, so x and y keep meaning `map` x and y and every label stays honest —
+  x therefore points right, and y up, only when squaring is off.
 - **Robot**: top view of DOME, to scale from `dome2`'s URDF: 0.30 m round
   plate, drive wheels, caster, lidar puck, camera bar at the front, and a
   heading chevron. It never shrinks below about 30 px. Grey with no halo

@@ -4,58 +4,69 @@
 
 - **F01, live map view, in progress.** Feature in
   `process/03-features/notdone/`, task file TF01 in `process/04-tasks/notdone/`.
-  **TF01.0–TF01.6 done**, and **TF01.7's map renders correctly from live
-  robot data** (see `history.md`). **Next: finish TF01.7's checklist, then
-  TF01.8**, the whole sidebar — objects list, camera panel, status line and
-  the four run graphs. **The graphs do not exist yet**; that is TF01.8, not a
-  fault.
+  **TF01.0–TF01.11 are done**, TF01.8 as far as `viz01` can show it. **Next:
+  check the objects half of TF01.8** against targets (see below), then
+  **TF01.12**, the demo, which needs the robot and you.
 
-- **Open issue I01** (`process/05-issues/open/`): a dead robot still reports
-  "live" at a frozen pose. Found on the first live run. Wants a decision, not
-  a quick patch — read it before touching `push_pose` or the status logic.
+- **87 tests pass**, `ruff` clean on `dome_viz/`, `test/`, `launch/` and
+  `setup.py`. `make view` and `make replay` work, both through `bl`
+  (`notes.md`, "Launchfiles use `better_launch`").
 
-### TF01.7 manual test — part done
+- **Open issues**: **I02** (`process/05-issues/open/`) — a backwards `/clock`
+  makes source ages negative, and a wrong clock now hides the robot
+  completely and silently. Read it before touching `lookup` or the status
+  logic. **F02 + TF02** are filed and *not approved*: squaring up the map, with
+  the grid-rotates-with-the-map decision already made.
 
-**Confirmed in a browser against the live robot on 2026-11-14: the map
-renders correctly** — right way up, not mirrored, robot inside the mapped
-area. That was the one thing no probe could check, and it means the
-`OccupancyGrid` row flip in `decodeFloor` is correct.
+### TF01.8 — the objects half is still unchecked
 
-**Still unchecked — steps 2 to 8 below.** Nobody has exercised pan, zoom,
-Fit map, Follow robot, the scale bar, the Laser toggle or the two themes.
-Work through them and record the result here.
+The sidebar was checked against a live `viz01` replay and approved: camera
+panel, the four graphs, the status line and the responsive collapse all look
+right.
 
-Remember: **after any edit under `static/`, `colcon build` and then hard-
-reload** (`notes.md`). Two rounds were lost to that and to the `[hidden]`
-CSS bug, both now fixed.
+**But the objects list was necessarily empty**, because `viz01` has no
+`/semantic/targets`. So these are still unverified, and they are half the
+point of the feature:
 
-Run it, in two terminals:
+- A pin plus a chip with the class icon and short ID, readable at any zoom.
+- Clicking a chip or a list row selects it, shows the detail block, and pans
+  **only** if the object was off-screen — never zooming. A second click
+  deselects; clicking empty map deselects.
+- Lost objects faded with a dashed outline, **never hidden**.
+- Where chips would collide, only the pin shows.
+- The list groups "In view now" above "Seen earlier".
+
+Two ways to get targets on screen:
 
 ```
-ros2 run dome_viz bridge_node --ros-args -p use_sim_time:=true
+make replay BAG=~/.dome/bags/f36run6      # 630 targets, but no /map
+```
+
+or run `dome_semantic` against the `viz01` replay, which regenerates targets
+from its `/oak/detections_3d` — that is how `test/fixtures/viz01replay.json`
+was made, and it is the only way to see objects **and** a floor plan at once.
+
+### The map checklist, to re-run after changes
+
+TF01.7's eight steps all passed on 2026-11-15 (`history.md`). Keep them as the
+procedure to re-run after TF01.8's objects work and after F02, since both
+change what is drawn.
+
+```
+bl dome_viz view.launch.py --use_sim_time True
 ros2 bag play ~/.dome/bags/viz01 --clock
 ```
 
-Then open `http://localhost:8080/` and check, recording the result here:
-
-1. ~~**The floor plan appears** the right way up and not mirrored.~~
-   **Confirmed 2026-11-14 against the live robot.**
-2. **The grid and origin**: faint lines, stronger x and y axes, a dot
-   labelled `0, 0`, x to the right and y up.
-3. **The robot** draws to scale with a heading chevron, and the trail
-   follows it as a soft line.
-4. **Pan** by dragging, **zoom** on the wheel and with + / −, **Fit map**
-   frames the whole map, **Follow robot** keeps it centred and switches off
-   as soon as you drag.
-5. **The scale bar** changes its labelled length as you zoom.
-6. **Laser** toggles the scan overlay.
-7. **The run ticker** counts up; the state reads "Live".
-8. **Dark and light** both look right (change the OS theme while it runs —
-   the floor raster rebuilds on the theme change).
-
-**There is no `launch/` file yet** (that is TF01.9), hence running the node
-by hand. **The whole sidebar is missing — camera, the four run graphs and
-the objects list are all TF01.8**, so expect only the top bar and the map.
+1. The floor plan the right way up and not mirrored, robot inside it.
+2. Grid and origin: stronger x and y axes, a dot labelled `0, 0`.
+3. The robot to scale with a heading chevron; the trail fainter at its old end.
+4. Pan by dragging; wheel zoom toward the pointer; Fit map; Follow robot,
+   which must switch off the moment you drag.
+5. The scale bar's width and label changing together.
+6. Laser toggling the scan overlay.
+7. The run ticker counting up, state reading "Live".
+8. Dark and light, changed while it runs — watch for the floor raster keeping
+   the old theme's colour.
 
 ### Running against the live robot
 
@@ -63,7 +74,7 @@ Same thing without `use_sim_time`, which must be off or the node's clock
 freezes with no `/clock` publisher:
 
 ```
-ros2 run dome_viz bridge_node
+bl dome_viz view.launch.py
 ```
 
 **The robot's own stack has to be up first.** With nothing running on the Pi
@@ -86,11 +97,14 @@ Two things seen live, neither a `dome_viz` fault:
   disabled, so the battery graphs stay empty. Check which topic it comes back
   on before changing anything.
 - **The laser overlay never appeared**, because `map` was missing from TF
-  entirely, so `take_scan`'s lookup failed every time. Same root cause as
-  **I01**; it is not a `/scan` QoS problem (the publisher is RELIABLE, and a
-  BEST_EFFORT subscriber is compatible with that).
+  entirely, so `take_scan`'s lookup failed every time — SLAM was publishing
+  the `/map` grid but not the `map -> odom` transform. Not a `/scan` QoS
+  problem (the publisher is RELIABLE, and a BEST_EFFORT subscriber is
+  compatible with that). **Worth re-checking on the next live run**: if
+  `map -> odom` is still missing while `/map` publishes, that is a robot-side
+  SLAM problem to file against `dome_nav`, not against `dome_viz`.
 
-**One open decision, due at TF01.9.** `bridge_node`'s `class_profile_path`
+**One open decision, now due before TF01.12's demo.** `bridge_node`'s `class_profile_path`
 parameter defaults to `""`, which makes targets show a raw label and a
 two-letter prefix (`CA7`) instead of "soda can · CN1". `dome_semantic` does
 not install its `class_profiles.yaml` — the only installed copy belongs to
@@ -151,8 +165,8 @@ running `dome_semantic` live against the replay regenerates them (that is how
 - **Noticed on the Pi, outside this project**: `~/.bashrc` exports
   `ROBOFLOW_API_KEY` in plaintext. Worth moving to an untracked file that
   `.bashrc` sources, since dotfiles tend to end up in repos.
-- **Literate docs** in `process/01-literate/` cover every Python module,
-  through TF01.6. **The page has none**: `.claude/literate.md`'s prompt is
-  written for Python ("convert the following Python program"), and the page is
-  still half-built. Worth one for `app.js` once TF01.8 lands — decide then
-  whether the prompt covers JS.
+- **Literate docs** cover every Python module: `01`-`06` plus appendices
+  `X01` (packaging) and `X02` (the launchfile and URL helper). **The page
+  still has none** — `.claude/literate.md`'s prompt is written for Python
+  ("convert the following Python program"), so `app.js` and `panels.js` are
+  undocumented there. Decide whether the prompt should cover JS.

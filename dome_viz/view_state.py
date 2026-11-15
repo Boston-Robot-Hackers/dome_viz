@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # view_state — robot data in, the page's JSON messages out
 # Author: Pito Salas and Claude Code
-# Version: 1
+# Version: 2
 # Created: 2026-11-14
-# Updated: 2026-11-14
+# Updated: 2026-11-15
 # Open Source Under MIT license
 """Everything the page shows, kept as plain state and sent as JSON messages.
 
@@ -21,7 +21,9 @@ Messages, by `type`:
 
 - `floor_plan`: `floor` is the grid as base64 bytes (row-major, row 0 at the
   lowest y; 0 unknown, 1 free), plus wall segments and clutter in `map` metres.
-- `targets`, `robot`, `laser`: positions in `map` metres.
+- `targets`, `robot`, `laser`: positions in `map` metres. A target also
+  carries its raw `label` (the canonical class), which the page needs to
+  choose that object's icon and colour.
 - `trail`, `run`: see `run_history`.
 - `status`: seconds since each source was heard (None if never), the run's
   elapsed seconds, and one `state`: live, waiting_for_map or not_connected.
@@ -83,6 +85,7 @@ def target_entry(target: TargetData, profiles: dict, now_s: float) -> dict:
     return {
         "id": short_id,
         "name": name,
+        "label": target.label,
         "x": round(target.x_m, 3),
         "y": round(target.y_m, 3),
         "observations": target.observation_count,
