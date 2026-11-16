@@ -102,7 +102,7 @@ stale and draws no robot (see issue I02).
 
 ## Bags for replay need `/map` and the image
 
-The `dome_semantic` F36 bags (e.g. `~/bags/f36run6`) record `/tf`,
+The `dome_semantic` F36 bags (e.g. `~/.dome/bags/f36run6`) record `/tf`,
 `/tf_static`, `/oak/detections_3d`, `/odom`, `/scan` and `/semantic/targets`,
 but **not `/map` or the camera image**. For replay, either record new bags
 with `/map` and `/oak/image_annotated_compressed` added, or run `slam_toolbox`
@@ -173,3 +173,114 @@ pattern). Never assert on `caplog.text`.
 - **Browser: plain JavaScript and an HTML `<canvas>`, no library.** Pan,
   zoom and a scale bar are a few dozen lines. No CDN (the page must work on a
   LAN with no internet), no build step, nothing to vendor.
+
+## Replaying with objects and a floor plan
+
+**Used for TF01.8's objects check, 2026-11-16.** Three terminals on
+the VM, robot stack off. `dome_semantic`'s launchfile has no sim-time
+argument, so the node runs through `ros2 run`. Use a fresh `map_name` each
+time, or `~/.dome/semantic_maps/<name>.json` is restored at startup.
+
+```
+bl dome_viz view.launch.py --sim_time True
+ros2 run dome_semantic semantic_map_node --ros-args -r __node:=semantic_map \
+  -p use_sim_time:=true -p map_name:=<fresh_name> \
+  -p class_profile_path:=$(ros2 pkg prefix dome_semantic)/share/dome_semantic/config/class_profiles.yaml \
+  --params-file $(ros2 pkg prefix dome_semantic)/share/dome_semantic/config/semantic_map.yaml
+ros2 bag play ~/.dome/bags/viz01 --clock
+```
+
+**Targets flicker early in the run**: `dome_semantic` confirms some, then
+withdraws them, and the page mirrors that by design (F01, Decisions).
+
+## The map checklist, to re-run after changes
+
+TF01.7's eight steps all passed on 2026-11-15 (`history.md`). Re-run them after
+anything that changes what is drawn, such as F02.
+
+```
+bl dome_viz view.launch.py --sim_time True
+ros2 bag play ~/.dome/bags/viz01 --clock
+```
+
+1. The floor plan the right way up and not mirrored, robot inside it.
+2. Grid and origin: stronger x and y axes, a dot labelled `0, 0`.
+3. The robot to scale with a heading chevron; the trail fainter at its old end.
+4. Pan by dragging; wheel zoom toward the pointer; Fit map; Follow robot,
+   which must switch off the moment you drag.
+5. The scale bar's width and label changing together.
+6. Laser toggling the scan overlay.
+7. The run ticker counting up, state reading "Live".
+8. Dark and light, changed while it runs — watch for the floor raster keeping
+   the old theme's colour.
+
+## Running against the live robot
+
+Launch without `--sim_time`, which must be off here, or the node's clock
+freezes with no `/clock` publisher:
+
+```
+bl dome_viz view.launch.py
+```
+
+**The robot's own stack has to be up first.** With nothing running on the Pi
+the VM sees only `/parameter_events` and `/rosout`, and the page correctly
+sits on "Waiting for the map". From `dome2/launch/robot.launch.py`'s header:
+
+```
+bl dome2 robot.launch.py                            # drivers, control, vision
+bl dome_nav robot_map.launch.py --map_name <name>   # Mode A: mapping, gives /map
+```
+
+Verified 2026-11-14: discovery needs no setup — both machines have
+`ROS_DOMAIN_ID` unset and `ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET`, and the
+robot answers in ~7 ms.
+
+## Target labels come from the robot's vision config
+
+**Fixed 2026-11-15** (`chores.md`). `class_profile_path` defaults to
+`dome_vision_ros`'s installed `class_profiles.yaml`, so the viewer cannot
+drift from the labels on the camera image. The bridge joins the published
+detector label (`can`) to the profile keyed by `canonical_class` (`soda can`)
+through `detector_labels`. Proven against `f36run6`: `soda can · CN1`,
+`coffee cup · CP23`.
+
+If `dome_vision_ros` is ever absent, the warning says so and targets fall
+back to their raw labels, which is `name_and_id`'s designed behaviour.
+
+## Working on the VM
+
+This clone is `~/ros2_ws/src/dome_viz` on host `vm`; ROS **kilted**, Python
+3.12, pytest 7.4.4, `ruff` 0.16.1. No `node`, so JavaScript cannot be
+syntax-checked here.
+
+- Do **not** source `/opt/ros/<distro>/setup.bash` by hand in a tool call —
+  the shell already has ROS from the user's profile. Only
+  `source install/setup.bash` is needed before pytest.
+- `caplog` captures nothing here; see "`caplog` does not work in this
+  workspace".
+
+## The replay bags
+
+**They live in `~/.dome/bags/`**, not `~/bags/`. Over GitHub's 100 MB limit,
+so never `git add` them.
+
+| topic | `viz01` (171 MiB, 446 s) | `f36run6` (29 MiB, 387 s) |
+| --- | --- | --- |
+| `/map` | 45 | — |
+| `/oak/image_annotated_compressed` | 4388 | — |
+| `/oak/detections_3d` | 4388 | 3865 |
+| `/semantic/targets` | — | 630 |
+| `/odom` | 10460 | 11542 |
+| `/scan` | 3966 | 3826 |
+| `/tf` / `/tf_static` | 24305 / 2 | 25564 / 1 |
+
+**Neither bag has `/telemetry/battery`, and that is expected**: the topic is
+temporarily disabled on the robot and will return (user, 2026-11-14). The
+battery and power graphs therefore stay empty under these bags. **Don't treat
+that as a bug or add code for it**: `ViewState` already tolerates a source
+that never publishes, which gets no key in `heard_s` at all.
+
+**`viz01` has no `/semantic/targets`**; running `dome_semantic` against it
+regenerates them (see "Replaying with objects and a floor plan"). One such
+run is saved as `test/fixtures/viz01replay.json`.
