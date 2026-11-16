@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # test_floor_plan — occupancy grid cleanup and steady wall segments
 # Author: Pito Salas and Claude Code
-# Version: 2
+# Version: 3
 # Created: 2026-11-14
-# Updated: 2026-11-14
+# Updated: 2026-11-16
 # Open Source Under MIT license
 
 import math
@@ -140,6 +140,19 @@ def test_real_map_keeps_walls_and_drops_specks():
     assert FloorPlanner().update(occupancy_data).walls
 
 
+def test_wall_cells_and_clutter_cover_every_occupied_cell():
+    """Together they are every cleaned-up wall cell, none twice."""
+    occupancy_data = load_pgm_map("f36run6")
+    grid = classify(occupancy_data)
+    remove_wall_specks(grid)
+    fill_single_holes(grid)
+    plan = FloorPlanner().update(occupancy_data)
+    assert len(plan.wall_cells_xy_m) and len(plan.clutter_xy_m)
+    every_cell = np.vstack([plan.wall_cells_xy_m, plan.clutter_xy_m])
+    assert len(every_cell) == (grid == WALL).sum()
+    assert len(np.unique(every_cell, axis=0)) == len(every_cell)
+
+
 def test_l_gives_two_segments_meeting_at_corner():
     percent = free_grid(60, 60)
     draw(percent, (0.5, 0.5), (2.5, 0.5))
@@ -158,11 +171,16 @@ def test_rotated_room_segments_follow_its_angle():
     percent = free_grid(100, 100)
     for index in range(4):
         draw(percent, corners[index], corners[(index + 1) % 4])
-    walls = FloorPlanner().update(occupancy(percent)).walls
-    assert len(walls) >= 4
-    for x1, y1, x2, y2 in walls:
+    plan = FloorPlanner().update(occupancy(percent))
+    assert len(plan.walls) >= 4
+    for x1, y1, x2, y2 in plan.walls:
         heading = math.degrees(math.atan2(y2 - y1, x2 - x1)) % 90
         assert abs(heading - 30) < 2
+    assert abs(math.degrees(plan.angle_rad) - 30) < 2
+
+
+def test_a_map_with_no_wall_reports_angle_zero():
+    assert FloorPlanner().update(occupancy(free_grid(20, 20))).angle_rad == 0.0
 
 
 def test_refit_of_unchanged_map_is_identical():

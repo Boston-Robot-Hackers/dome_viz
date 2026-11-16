@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # floor_plan — clean an occupancy grid into a floor, wall segments and clutter
 # Author: Pito Salas and Claude Code
-# Version: 1
+# Version: 2
 # Created: 2026-11-14
-# Updated: 2026-11-14
+# Updated: 2026-11-16
 # Open Source Under MIT license
 """Turn slam_toolbox's `/map` into what the page draws.
 
@@ -73,14 +73,20 @@ class OccupancyData:
 class FloorPlan:
     """`floor` is height x width uint8, FREE or UNKNOWN (wall cells are FREE).
 
-    `walls` are [x1, y1, x2, y2] and `clutter_xy_m` is N x 2, in `map` metres.
+    `walls` are [x1, y1, x2, y2] in `map` metres. `wall_cells_xy_m` (the
+    occupied cells under the walls) and `clutter_xy_m` (the rest) are N x 2,
+    also in `map` metres; together they are every occupied cell.
+    `angle_rad` is the room's main wall direction, 0 to pi/2, and 0.0 until
+    the planner has one.
     """
 
     floor: np.ndarray
     walls: list
+    wall_cells_xy_m: np.ndarray
     clutter_xy_m: np.ndarray
     origin_xy_m: tuple
     resolution_m: float
+    angle_rad: float
 
 
 def classify(occupancy: OccupancyData) -> np.ndarray:
@@ -186,9 +192,11 @@ class FloorPlanner:
         return FloorPlan(
             floor=np.where(grid == UNKNOWN, UNKNOWN, FREE).astype(np.uint8),
             walls=[to_segment(line, self.angle_rad) for line in lines],
+            wall_cells_xy_m=points[used],
             clutter_xy_m=points[~used],
             origin_xy_m=tuple(occupancy.origin_xy_m),
             resolution_m=resolution,
+            angle_rad=0.0 if self.angle_rad is None else self.angle_rad,
         )
 
     def keep_steady(self, lines: list, keys: set, resolution_m: float) -> list:

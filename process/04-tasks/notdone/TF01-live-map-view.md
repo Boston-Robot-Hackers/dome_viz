@@ -450,3 +450,55 @@ with the viewer and camera off, and with the camera on. Record all three in
 *Test*: manual. Pass: the view works on the bag and live, in both
 browsers, and the Pi's CPU with the
 camera off matches no viewer within noise.
+
+## TF01.13 — Lighter fitted walls
+
+**Status**: done 2026-11-16, user approved the second pass ("it looks good now").
+
+**Done before TF01.12**, so the demo shows the finished page; the numbers
+follow the order the steps were added, not the order they run.
+
+**Description**: The user found the fitted walls too heavy. `drawWalls`
+stroked them at `max(2.5 px, 7 cm)` in near-black ink; halve that to
+`max(1.5 px, 3.5 cm)`, then adjust by eye.
+
+**Colour too** (user: "wall color should not be black"): `--wall` goes from
+near-black `#28303b` to slate `#5b7088` in light mode, and from `#d9dfe6` to
+`#9fb1c4` in dark. The robot's outline used `--wall` as its ink; it now uses
+`--fg`, nearly the same colour, so it is unchanged.
+
+**Second pass** (user: still too thick and too dark, and a slightly different
+shade): `max(1 px, 2 cm)`; light steel blue `#7f97b2` in light mode, `#7d93ab`
+in dark. The Key's wall swatch thinned to match.
+
+*Test*: manual, as TF01.7 — a visual judgement.
+
+## TF01.14 — Show the wall cells as well (experiment)
+
+**Status**: done 2026-11-16, kept by the user.
+
+**Description**: The user wants to see every occupied map cell, not only the
+clutter the wall fitter left over. `FloorPlan` gains `wall_cells_xy_m`, the
+cells under the fitted lines; the `floor_plan` message carries them as
+`wall_cells`; the page draws them as grey squares, like clutter, under the
+wall lines.
+
+**Kept** (user, 2026-11-16).
+
+*Test*: `test_wall_cells_and_clutter_cover_every_occupied_cell`; the look is
+manual.
+
+## TF01.15 — A key to the map's symbols
+
+**Status**: done 2026-11-16, user approved ("looks good").
+
+**Description**: The user asked for a legend. A "Key" panel at the bottom of
+the sidebar, a `<details>` element closed by default, so it needs no
+JavaScript. Each entry is a small inline SVG drawn with the map's own colour
+tokens, so it follows the theme and any later colour change. Object entries
+reuse the real `.marker` pin and chip classes. Entries: robot, trail, fitted
+wall, occupied cells, laser, object, object not seen recently, origin and
+axes, explored and unexplored floor.
+
+*Test*: manual — each entry checked against the map, in both themes.
+

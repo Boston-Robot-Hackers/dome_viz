@@ -133,6 +133,13 @@ caches the CSS and JS.
 `aiohttp`'s `add_static` takes `follow_symlinks=False` by default and refuses
 symlinked files. Loosening that for a convenience is not worth it.
 
+**Python changes also need the viewer restarted** (found 2026-11-16, F02).
+A running bridge keeps the code it started with, while the page is re-read
+on every reload. A new page against an old bridge can break outright: the
+page read `angle_rad`, the old bridge never sent it, every screen position
+became `NaN`, and the walls vanished. So after a rebuild that touched
+`dome_viz/*.py`, `make stop` and relaunch before judging the page.
+
 **How to apply**: after changing the page, rebuild, then hard-reload. If a
 change seems to have no effect, `curl` the asset and grep for it before
 suspecting the code:

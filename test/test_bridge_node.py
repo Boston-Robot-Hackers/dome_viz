@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # test_bridge_node — topic callbacks, TF-less pose, camera subscription life
 # Author: Pito Salas and Claude Code
-# Version: 4
+# Version: 5
 # Created: 2026-11-14
-# Updated: 2026-11-15
+# Updated: 2026-11-16
 # Open Source Under MIT license
 """The bridge with a fake web server in place of the real one.
 
@@ -202,14 +202,39 @@ def test_pose_is_pushed_once_tf_answers(node):
     assert robot["yaw"] == pytest.approx(0.0)
 
 
-def test_scan_is_skipped_when_tf_has_no_transform(node):
+def a_scan(stamp=None) -> LaserScan:
     scan = LaserScan()
     scan.header.frame_id = "laser"
+    if stamp is not None:
+        scan.header.stamp = stamp
     scan.angle_increment = 0.01
     scan.range_min, scan.range_max = 0.1, 10.0
     scan.ranges = [1.0] * 10
-    node.take_scan(scan)
+    return scan
+
+
+def test_scan_is_skipped_when_tf_has_no_transform(node):
+    node.take_scan(a_scan())
     assert node.server.messages == []
+
+
+def test_a_scan_ahead_of_tf_is_sent_once_tf_catches_up(node):
+    """`/scan` is stamped ahead of the newest transform, as on `viz01`.
+
+    Looked up only on arrival, almost every scan was dropped and the laser
+    fell far behind the robot.
+    """
+    now = node.get_clock().now()
+    earlier = (now - Duration(seconds=0.05)).to_msg()
+    node.tf_buffer.set_transform(a_transform("map", "laser", 1.0, 0.0, earlier), "test")
+    node.take_scan(a_scan(now.to_msg()))
+    assert "laser" not in types_in(node.server)
+    node.tf_buffer.set_transform(
+        a_transform("map", "laser", 1.0, 0.0, now.to_msg()), "test"
+    )
+    node.push_pose()
+    assert only(node.server, "laser")["origin"] == [1.0, 0.0]
+    assert node.pending_scan is None
 
 
 def test_camera_subscription_lives_only_while_a_page_wants_it(node):

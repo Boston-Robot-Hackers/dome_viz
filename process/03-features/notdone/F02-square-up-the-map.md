@@ -2,13 +2,15 @@
 
 **Priority**: Medium
 
+**Approved:** 2026-11-16, by the user.
+
 **Done:** no
 
 **Tasks File Created:** yes
 
-**Tests Written:** no
+**Tests Written:** yes
 
-**Test Passing:** no
+**Test Passing:** yes
 
 **Description**: Draw the map rotated so the room's **main wall direction
 runs horizontally and vertically** on screen, instead of at whatever angle the

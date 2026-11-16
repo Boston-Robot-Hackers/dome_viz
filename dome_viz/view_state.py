@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # view_state — robot data in, the page's JSON messages out
 # Author: Pito Salas and Claude Code
-# Version: 4
+# Version: 5
 # Created: 2026-11-14
-# Updated: 2026-11-15
+# Updated: 2026-11-16
 # Open Source Under MIT license
 """Everything the page shows, kept as plain state and sent as JSON messages.
 
@@ -20,7 +20,10 @@ fresh floor planner, trail and graph series, and the run ticker restarts.
 Messages, by `type`:
 
 - `floor_plan`: `floor` is the grid as base64 bytes (row-major, row 0 at the
-  lowest y; 0 unknown, 1 free), plus wall segments and clutter in `map` metres.
+  lowest y; 0 unknown, 1 free), plus wall segments, the wall cells under
+  them and the leftover clutter cells, all in `map` metres, and `angle_rad`,
+  the room's wall direction wrapped to plus or minus pi/4, which the page
+  turns the view by to square the walls up.
 - `targets`, `robot`, `laser`: positions in `map` metres. A target also
   carries its raw `label` — the detector's class, e.g. "can", *not* the
   profile's canonical "soda can" — which the page needs to choose that
@@ -119,6 +122,14 @@ def laser_hits(lidar_in_map: Pose2D, scan: ScanData) -> list:
     return hits
 
 
+def view_angle_rad(wall_angle_rad: float) -> float:
+    """The smallest turn that squares the walls: a 0 to pi/2 angle wrapped to
+    plus or minus pi/4, so a room at 80 degrees turns by -10, not 80."""
+    if wall_angle_rad > math.pi / 4:
+        return wall_angle_rad - math.pi / 2
+    return wall_angle_rad
+
+
 def floor_plan_message(plan: FloorPlan) -> dict:
     height, width = plan.floor.shape
     return {
@@ -129,7 +140,9 @@ def floor_plan_message(plan: FloorPlan) -> dict:
         "origin": [round(value, 3) for value in plan.origin_xy_m],
         "floor": base64.b64encode(plan.floor.tobytes()).decode("ascii"),
         "walls": plan.walls,
+        "wall_cells": plan.wall_cells_xy_m.round(3).tolist(),
         "clutter": plan.clutter_xy_m.round(3).tolist(),
+        "angle_rad": round(view_angle_rad(plan.angle_rad), 4),
     }
 
 

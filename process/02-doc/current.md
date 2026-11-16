@@ -2,21 +2,21 @@
 
 ## Open
 
-### Pick up here (2026-11-16)
+### Pick up here (2026-11-16, later)
 
-- **TF01.8 done**: the objects check passed on a `viz01` replay with
-  `dome_semantic` live; two page bugs fixed (`chores.md`).
-- **Next: TF01.12**, the demo on the live robot, which needs you. At it, run
-  the "last heard" chore's manual check, which a replay cannot reach (I02).
-- `.claude/` synced from `~/j3` (`process.md`, `style_guide.md`,
-  `/checkpoint`, `/start`, the session-start hook); `settings.json` kept.
+- **F01 page tweaks done and approved**: lighter steel-blue walls (TF01.13),
+  wall cells drawn as grey squares (TF01.14), a Key panel (TF01.15). Chores:
+  laser scans no longer dropped, class colours defined, `make view` /
+  `make replay` guard against the wrong clock.
+- **F02 approved and built**: Square up passed every replay check but one.
+- **Next: the live session** (TF01.12), which needs you and the robot.
 
 ### Next
 
-- **F01, live map view**: TF01.0–TF01.11 done; TF01.12 left. Feature and
-  task file in `notdone/`. 93 tests pass.
-- **F02 + TF02, squaring up the map**: filed, *not approved*. Re-run the map
-  checklist (`notes.md`) after it.
+- **F01**: only TF01.12 left, the live demo plus Pi CPU measurements.
+- **F02**: closes after its one deferred check, at the live session.
+- **Warn once when transforms are rejected as stale** (I02's first fix):
+  the wrong clock has silently hidden the robot twice today.
 
 ### Open issues
 
@@ -26,6 +26,10 @@
 
 ### Check on the next live run
 
+- **Last heard**: stop the robot's stack and confirm the status line counts
+  up from then, not from the camera's older age (`chores.md`).
+- **Selecting an off-screen object** pans it gently into view with Square up
+  on (TF02.2).
 - **Battery** comes as `/battery`; the bridge reads `/telemetry/battery`,
   which is temporarily off. See which one returns before changing anything.
 - **Laser overlay missing live**: SLAM published `/map` but no `map -> odom`
@@ -43,5 +47,5 @@
 
 ### Chores
 
-- Split `static/app.js` (542 lines); parked until F02 changes the view
-  transform (`chores.md`).
+- Split `static/app.js` (580 lines); F02 has landed, so it is no
+  longer blocked (`chores.md`).

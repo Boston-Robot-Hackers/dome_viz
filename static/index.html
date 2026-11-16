@@ -56,6 +56,7 @@
           <button class="btn" id="fit">Fit map</button>
           <button class="btn" id="follow" aria-pressed="false">Follow robot</button>
           <button class="btn" id="laser" aria-pressed="true" title="Show what the laser sees right now">Laser</button>
+          <button class="btn" id="square" aria-pressed="true" title="Turn the view so the room's walls run straight across and down">Square up</button>
         </div>
       </div>
     </div>
@@ -81,6 +82,21 @@
         <div class="panel-head"><h2 id="objectsHead">Objects</h2></div>
         <div class="objects-body" id="objectsBody"></div>
       </section>
+
+      <details class="panel key">
+        <summary class="panel-head"><h2>Key</h2></summary>
+        <ul class="key-list">
+          <li><svg viewBox="0 0 28 20" aria-hidden="true"><circle cx="13" cy="10" r="7" class="k-plate"/><path d="M12 7l4 3-4 3" class="k-robot"/></svg>The robot, to scale, pointing the way it faces</li>
+          <li><svg viewBox="0 0 28 20" aria-hidden="true"><path d="M2 15 L10 11" class="k-trail" opacity=".15"/><path d="M10 11 L18 9" class="k-trail" opacity=".35"/><path d="M18 9 L26 5" class="k-trail" opacity=".57"/></svg>Where it has driven this run</li>
+          <li><svg viewBox="0 0 28 20" aria-hidden="true"><path d="M3 10 H25" class="k-wall"/></svg>A wall, fitted to the map</li>
+          <li><svg viewBox="0 0 28 20" aria-hidden="true"><rect x="5" y="8" width="4" height="4" class="k-cell"/><rect x="12" y="8" width="4" height="4" class="k-cell"/><rect x="19" y="8" width="4" height="4" class="k-cell"/></svg>Occupied map cells: walls and clutter</li>
+          <li><svg viewBox="0 0 28 20" aria-hidden="true"><path d="M3 10 L24 3 M3 10 L25 10 M3 10 L24 17" class="k-ray"/><circle cx="24" cy="3" r="1.6" class="k-hit"/><circle cx="25" cy="10" r="1.6" class="k-hit"/><circle cx="24" cy="17" r="1.6" class="k-hit"/></svg>What the laser sees right now</li>
+          <li><span class="marker key-marker" style="--cls: var(--can)"><span class="pin"></span><span class="chip"><svg aria-hidden="true"><use href="#ic-can"/></svg>CN1</span></span>An object, with its class and ID</li>
+          <li><span class="marker key-marker" data-lost="true" style="--cls: var(--can)"><span class="pin"></span><span class="chip"><svg aria-hidden="true"><use href="#ic-can"/></svg>CN1</span></span>An object not seen recently</li>
+          <li><svg viewBox="0 0 28 20" aria-hidden="true"><path d="M6 14 H24 M6 14 V2" class="k-axis"/><circle cx="6" cy="14" r="3" class="k-origin"/></svg>The map's origin, 0, 0, and its x and y axes</li>
+          <li><svg viewBox="0 0 28 20" aria-hidden="true"><rect x="3" y="4" width="10" height="12" class="k-floor"/><rect x="15" y="4" width="10" height="12" class="k-unknown"/></svg>Explored floor, then unexplored</li>
+        </ul>
+      </details>
     </aside>
   </div>
 </div>

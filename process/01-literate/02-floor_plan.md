@@ -79,10 +79,16 @@ Keys are computed from metres, not grid indices, so they stay comparable when th
 FloorPlan(
     floor=np.where(grid == UNKNOWN, UNKNOWN, FREE).astype(np.uint8),
     walls=[to_segment(line, self.angle_rad) for line in lines],
+    wall_cells_xy_m=points[used],
     clutter_xy_m=points[~used],
     ...
+    angle_rad=0.0 if self.angle_rad is None else self.angle_rad,
 )
 ```
+
+`used` splits the occupied cells in two: the **wall cells** under some fitted line, and the **clutter** no line explains. Together they are every occupied cell, none twice, which `test_wall_cells_and_clutter_cover_every_occupied_cell` checks against the real `f36run6` map. The page draws both as grey squares, so a viewer sees the raw evidence under each fitted wall.
+
+`angle_rad` hands the room's direction to the page, which turns the view by it to square the walls up (F02). It is 0.0 until the planner has a direction, so the page always has a number.
 
 Wall cells are reported as **free** in `floor`. The page draws walls as segments on top, so the floor under a wall should look like room, not like a hole.
 

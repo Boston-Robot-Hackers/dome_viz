@@ -112,3 +112,15 @@
   the state at live.
 - **`/start` slimmed** to read only `current.md`, synced from `~/j3`;
   `CLAUDE.md` gained the template's "Hazards before any edit" section.
+- **Laser no longer lags** (`chores.md`): ~96 % of scans were dropped
+  because each was looked up before TF reached its stamp. The newest scan
+  now waits and is retried on the pose timer. Measured with a probe on
+  `viz01` (24 of 647 resolved before); user confirmed the rays keep up.
+- **F01 page tweaks, all approved**: walls thinner and light steel blue
+  (TF01.13), every occupied cell drawn as a grey square (TF01.14), a Key
+  panel in the sidebar (TF01.15). The object class colours, defined in the
+  mockup but never in `app.css`, now are.
+- **F02 approved and built**: the view squares the room up, with a Square up
+  toggle. Every replay check passed but one, deferred to the live session.
+- **`make view` / `make replay`** now say which clock each uses and refuse
+  the mix-ups that silently drew no robot (twice today).

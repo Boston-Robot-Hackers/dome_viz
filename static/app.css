@@ -5,7 +5,7 @@
 :root {
   --unknown: #e6e8e4;      /* unexplored: the page itself */
   --floor: #fbfbf7;        /* free space */
-  --wall: #28303b;         /* walls, drawn as ink */
+  --wall: #7f97b2;         /* fitted wall lines: light steel blue, not ink */
   --surface: #ffffff;      /* panels */
   --line: #d3d7d0;
   --fg: #1d232b;
@@ -14,6 +14,8 @@
   --grid: rgb(40 48 59 / .10);
   --axis: #3d4652;
   --clutter: #8b939c;
+  --can: #c2410c;          /* object classes, from the approved mockup */
+  --cup: #6b3fc4;
   --ok: #2f8f46;
   --warn: #b7791f;
   --bad: #c93c3c;
@@ -23,19 +25,19 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --unknown: #12161b; --floor: #232a33; --wall: #d9dfe6; --surface: #1a2027;
+    --unknown: #12161b; --floor: #232a33; --wall: #7d93ab; --surface: #1a2027;
     --line: #313a45; --fg: #e8ecf0; --muted: #98a2ad; --robot: #3fc6cf;
     --grid: rgb(217 223 230 / .10); --axis: #c3cbd4; --clutter: #6c7784;
-    --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
+    --can: #f0804a; --cup: #a98bf0; --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
     --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --unknown: #12161b; --floor: #232a33; --wall: #d9dfe6; --surface: #1a2027;
+  --unknown: #12161b; --floor: #232a33; --wall: #7d93ab; --surface: #1a2027;
   --line: #313a45; --fg: #e8ecf0; --muted: #98a2ad; --robot: #3fc6cf;
   --grid: rgb(217 223 230 / .10); --axis: #c3cbd4; --clutter: #6c7784;
-  --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
+  --can: #f0804a; --cup: #a98bf0; --ok: #4fbf6a; --warn: #e0a83c; --bad: #ee6a6a;
   --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
   color-scheme: dark;
 }
@@ -153,6 +155,27 @@ canvas#map { position: absolute; inset: 0; width: 100%; height: 100%; display: b
   display: flex; align-items: center; justify-content: space-between;
   gap: 8px; padding: 10px 12px 8px;
 }
+
+/* key: swatches use the map's own colour tokens, so they follow the theme */
+.key summary { cursor: pointer; list-style: none; }
+.key summary::-webkit-details-marker { display: none; }
+.key summary h2::before { content: "▸ "; }
+.key[open] summary h2::before { content: "▾ "; }
+.key-list { list-style: none; margin: 0; padding: 0 12px 10px; font-size: 12px; }
+.key-list li { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.key-list > li > svg { width: 28px; height: 20px; flex: none; }
+.key-list .key-marker { position: static; transform: none; pointer-events: none; flex: none; }
+.key-list .key-marker .chip { box-shadow: none; }
+.k-plate { fill: var(--surface); stroke: var(--robot); stroke-width: 2; }
+.k-robot, .k-trail { fill: none; stroke: var(--robot); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.k-wall { stroke: var(--wall); stroke-width: 1.6; stroke-linecap: round; }
+.k-cell { fill: var(--clutter); }
+.k-ray { stroke: var(--robot); stroke-width: 1; opacity: .35; }
+.k-hit { fill: var(--robot); opacity: .6; }
+.k-axis { fill: none; stroke: var(--axis); stroke-width: 2; }
+.k-origin { fill: var(--surface); stroke: var(--fg); stroke-width: 1.5; }
+.k-floor { fill: var(--floor); stroke: var(--line); }
+.k-unknown { fill: var(--unknown); stroke: var(--line); }
 
 /* objects list */
 .objects-body { padding: 0 6px 8px; }

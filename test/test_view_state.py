@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # test_view_state — labels, lost targets, status, run start, laser, floor plan
 # Author: Pito Salas and Claude Code
-# Version: 3
+# Version: 4
 # Created: 2026-11-14
-# Updated: 2026-11-15
+# Updated: 2026-11-16
 # Open Source Under MIT license
 
 import base64
@@ -25,6 +25,7 @@ from dome_viz.view_state import (
     ViewState,
     name_and_id,
     target_entry,
+    view_angle_rad,
 )
 
 CAN_PROFILE = {
@@ -176,6 +177,13 @@ def test_floor_plan_message_encodes_floor():
     (plan,) = by_type(state.on_map(occupancy, 0.0), "floor_plan")
     assert (plan["width"], plan["height"], plan["origin"]) == (3, 1, [1.0, 2.0])
     assert list(base64.b64decode(plan["floor"])) == [0, 1, 1]
+    assert plan["angle_rad"] == 0.0
+
+
+def test_view_angle_is_the_smallest_turn():
+    assert view_angle_rad(math.radians(10)) == pytest.approx(math.radians(10))
+    assert view_angle_rad(math.radians(80)) == pytest.approx(math.radians(-10))
+    assert view_angle_rad(math.pi / 4) == pytest.approx(math.pi / 4)
 
 
 def test_targets_feed_objects_series():

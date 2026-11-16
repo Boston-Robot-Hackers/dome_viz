@@ -19,7 +19,7 @@
 
   const state = {
     scale: 80, cx: 0, cy: 0,       // px per metre, view centre in map metres
-    follow: false, showLaser: true, selected: null,
+    follow: false, showLaser: true, selected: null, isSquared: true,
     isSocketOpen: false, robotState: "not_connected",
   };
   const world = {
@@ -120,26 +120,38 @@
   }
 
   // ---- view transform -----------------------------------------------------
-  const toScreen = (x, y) => [
-    stage.clientWidth / 2 + (x - state.cx) * state.scale,
-    stage.clientHeight / 2 - (y - state.cy) * state.scale,
-  ];
-  const toWorld = (sx, sy) => [
-    state.cx + (sx - stage.clientWidth / 2) / state.scale,
-    state.cy - (sy - stage.clientHeight / 2) / state.scale,
-  ];
+  // The view turns by -angle_rad when squared up, so the room's walls run
+  // across and down the screen; map coordinates themselves never change.
+  const viewRot = () => (state.isSquared && world.plan ? -world.plan.angle_rad : 0);
+  const toScreen = (x, y) => {
+    const rot = viewRot(), c = Math.cos(rot), s = Math.sin(rot);
+    const dx = x - state.cx, dy = y - state.cy;
+    return [
+      stage.clientWidth / 2 + (dx * c - dy * s) * state.scale,
+      stage.clientHeight / 2 - (dx * s + dy * c) * state.scale,
+    ];
+  };
+  const toWorld = (sx, sy) => {
+    const rot = viewRot(), c = Math.cos(rot), s = Math.sin(rot);
+    const rx = (sx - stage.clientWidth / 2) / state.scale;
+    const ry = -(sy - stage.clientHeight / 2) / state.scale;
+    return [state.cx + rx * c + ry * s, state.cy - rx * s + ry * c];
+  };
   const clampScale = (s) => Math.min(600, Math.max(15, s));
 
   function fit() {
     const plan = world.plan;
     if (!plan) return;
     const { width: w, height: h, resolution_m: res, origin } = plan;
+    const rot = viewRot(), c = Math.cos(rot), s = Math.sin(rot);
+    // The bounds are taken in the turned frame, as the screen will show them.
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (let row = 0; row < h; row++) for (let col = 0; col < w; col++) {
       if (!plan.field[row * w + col]) continue;
       const x = origin[0] + col * res, y = origin[1] + (h - 1 - row) * res;
-      minX = Math.min(minX, x); maxX = Math.max(maxX, x);
-      minY = Math.min(minY, y); maxY = Math.max(maxY, y);
+      const u = x * c - y * s, v = x * s + y * c;
+      minX = Math.min(minX, u); maxX = Math.max(maxX, u);
+      minY = Math.min(minY, v); maxY = Math.max(maxY, v);
     }
     if (minX > maxX) return;                  // a map with no known cells yet
     const sw = stage.clientWidth, sh = stage.clientHeight;
@@ -147,8 +159,9 @@
       (sw - 80) / Math.max(maxX - minX, res),
       (sh - 120) / Math.max(maxY - minY, res),
     ));
-    state.cx = (minX + maxX) / 2;
-    state.cy = (minY + maxY) / 2;
+    const midU = (minX + maxX) / 2, midV = (minY + maxY) / 2;
+    state.cx = midU * c + midV * s;
+    state.cy = -midU * s + midV * c;
     setFollow(false);
   }
 
@@ -171,7 +184,9 @@
       const size = plan.resolution_m * state.scale;
       ctx.imageSmoothingEnabled = true;
       ctx.globalAlpha = isOffline() ? .55 : 1;
-      ctx.drawImage(raster, left, top, plan.width * size, plan.height * size);
+      ctx.save(); ctx.translate(left, top); ctx.rotate(-viewRot());
+      ctx.drawImage(raster, 0, 0, plan.width * size, plan.height * size);
+      ctx.restore();
       ctx.globalAlpha = 1;
       drawGrid(); drawWalls(); drawOrigin(); drawLaser(); drawTrail(); drawRobot();
     }
@@ -192,35 +207,45 @@
     return [0.5, 1, 2, 5, 10].find((s) => s * state.scale >= 46) ?? 10;
   }
 
+  // Grid lines are map x and y, so they turn with the view; labels sit where
+  // each line crosses the top or left edge.
   function drawGrid() {
     const w = stage.clientWidth, h = stage.clientHeight, step = gridStep();
-    const [x0, y1] = toWorld(0, 0), [x1, y0] = toWorld(w, h);
+    const corners = [toWorld(0, 0), toWorld(w, 0), toWorld(0, h), toWorld(w, h)];
+    const xs = corners.map((p) => p[0]), ys = corners.map((p) => p[1]);
+    const [x0, x1] = [Math.min(...xs), Math.max(...xs)];
+    const [y0, y1] = [Math.min(...ys), Math.max(...ys)];
+    const ticks = (lo, hi) => {
+      const values = [];
+      for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) values.push(v);
+      return values;
+    };
+    const line = (a, b) => {
+      const [ax, ay] = toScreen(...a), [bx, by] = toScreen(...b);
+      ctx.moveTo(ax, ay); ctx.lineTo(bx, by);
+    };
     ctx.lineWidth = 1; ctx.strokeStyle = css("--grid");
     ctx.beginPath();
-    for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) {
-      const sx = Math.round(toScreen(x, 0)[0]) + .5;
-      ctx.moveTo(sx, 0); ctx.lineTo(sx, h);
-    }
-    for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) {
-      const sy = Math.round(toScreen(0, y)[1]) + .5;
-      ctx.moveTo(0, sy); ctx.lineTo(w, sy);
-    }
+    for (const x of ticks(x0, x1)) line([x, y0], [x, y1]);
+    for (const y of ticks(y0, y1)) line([x0, y], [x1, y]);
     ctx.stroke();
     ctx.fillStyle = css("--muted");
     ctx.font = `500 10px ${css("--font-data")}`;
     const label = (v) => `${Number(v.toFixed(1))}`;
+    const [topA, topB] = [toWorld(0, 10), toWorld(w, 10)];
     ctx.textAlign = "center"; ctx.textBaseline = "top";
-    for (let x = Math.ceil(x0 / step) * step; x <= x1; x += step) {
-      if (Math.abs(x) > 1e-9) ctx.fillText(label(x), toScreen(x, 0)[0], 4);
+    for (const x of ticks(x0, x1)) {
+      const t = (x - topA[0]) / (topB[0] - topA[0]);
+      if (Math.abs(x) > 1e-9 && t >= 0 && t <= 1) ctx.fillText(label(x), t * w, 4);
     }
+    const [leftA, leftB] = [toWorld(4, 0), toWorld(4, h)];
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    for (let y = Math.ceil(y0 / step) * step; y <= y1; y += step) {
-      if (Math.abs(y) > 1e-9) ctx.fillText(label(y), 4, toScreen(0, y)[1]);
+    for (const y of ticks(y0, y1)) {
+      const t = (y - leftA[1]) / (leftB[1] - leftA[1]);
+      if (Math.abs(y) > 1e-9 && t >= 0 && t <= 1) ctx.fillText(label(y), 4, t * h);
     }
-    const [ox, oy] = toScreen(0, 0);
     ctx.lineWidth = 1.5; ctx.strokeStyle = css("--axis"); ctx.globalAlpha = .55;
-    ctx.beginPath(); ctx.moveTo(0, oy); ctx.lineTo(w, oy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(ox, 0); ctx.lineTo(ox, h); ctx.stroke();
+    ctx.beginPath(); line([x0, 0], [x1, 0]); line([0, y0], [0, y1]); ctx.stroke();
     ctx.globalAlpha = 1;
   }
 
@@ -239,8 +264,9 @@
       ctx.textAlign = "center"; ctx.textBaseline = "middle";
       ctx.fillText(text, ox + dx * (len + 14), oy + dy * (len + 14));
     };
-    arrow(1, 0, "x");
-    arrow(0, -1, "y");
+    const rot = viewRot(), c = Math.cos(rot), s = Math.sin(rot);
+    arrow(c, -s, "x");
+    arrow(-s, -c, "y");
     ctx.fillStyle = css("--surface"); ctx.strokeStyle = css("--fg"); ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(ox, oy, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.font = `600 11px ${css("--font-data")}`; ctx.fillStyle = css("--fg");
@@ -253,12 +279,12 @@
     ctx.globalAlpha = isOffline() ? .55 : 1;
     ctx.fillStyle = css("--clutter");
     const dot = Math.max(1.5, plan.resolution_m * state.scale * .5);
-    for (const [x, y] of plan.clutter) {
+    for (const [x, y] of [...plan.wall_cells, ...plan.clutter]) {
       const [sx, sy] = toScreen(x, y);
       ctx.fillRect(sx - dot / 2, sy - dot / 2, dot, dot);
     }
     ctx.strokeStyle = css("--wall"); ctx.lineCap = "round";
-    ctx.lineWidth = Math.max(2.5, .07 * state.scale);
+    ctx.lineWidth = Math.max(1, .02 * state.scale);
     ctx.beginPath();
     for (const [x1, y1, x2, y2] of plan.walls) {
       const [a, b] = toScreen(x1, y1), [c, d] = toScreen(x2, y2);
@@ -315,12 +341,12 @@
     const s = Math.max(state.scale, 30 / 0.30);
     const offline = isOffline();
     const accent = offline ? css("--muted") : css("--robot");
-    const ink = css("--wall"), surface = css("--surface");
+    const ink = css("--fg"), surface = css("--surface");
     const rrect = (cx, cy, len, wid, rad) => {
       ctx.beginPath();
       ctx.roundRect((cx - len / 2) * s, (-cy - wid / 2) * s, len * s, wid * s, rad * s);
     };
-    ctx.save(); ctx.translate(sx, sy); ctx.rotate(-robot.yaw);
+    ctx.save(); ctx.translate(sx, sy); ctx.rotate(-(robot.yaw + viewRot()));
     if (!offline) {
       ctx.fillStyle = accent; ctx.globalAlpha = .14;
       ctx.beginPath(); ctx.arc(0, 0, .25 * s, 0, Math.PI * 2); ctx.fill();
@@ -444,8 +470,9 @@
     } else {
       setFollow(false);
       hasDragged = true;
-      state.cx -= (event.clientX - previous[0]) / state.scale;
-      state.cy += (event.clientY - previous[1]) / state.scale;
+      const [ax, ay] = toWorld(previous[0], previous[1]);
+      const [bx, by] = toWorld(event.clientX, event.clientY);
+      state.cx -= bx - ax; state.cy -= by - ay;
     }
     requestDraw();
   });
@@ -461,8 +488,8 @@
     const [wx, wy] = toWorld(sx, sy);
     state.scale = clampScale(state.scale * factor);
     if (!state.follow) {
-      state.cx = wx - (sx - stage.clientWidth / 2) / state.scale;
-      state.cy = wy + (sy - stage.clientHeight / 2) / state.scale;
+      const [nx, ny] = toWorld(sx, sy);
+      state.cx += wx - nx; state.cy += wy - ny;
     }
     requestDraw();
   }
@@ -488,7 +515,7 @@
     if (!dx && !dy) return;
     setFollow(false);
     const from = [state.cx, state.cy];
-    const to = [state.cx + dx / state.scale, state.cy - dy / state.scale];
+    const to = toWorld(w / 2 + dx, h / 2 + dy);
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
       [state.cx, state.cy] = to;
       return;
@@ -531,6 +558,17 @@
   document.getElementById("laser").onclick = (event) => {
     state.showLaser = !state.showLaser;
     event.currentTarget.setAttribute("aria-pressed", state.showLaser);
+    requestDraw();
+  };
+
+  // A per-viewer preference, so browser storage; the view works without it.
+  const squareButton = document.getElementById("square");
+  try { state.isSquared = localStorage.getItem("domeViz.isSquared") !== "false"; } catch {}
+  squareButton.setAttribute("aria-pressed", state.isSquared);
+  squareButton.onclick = () => {
+    state.isSquared = !state.isSquared;   // turns about the centre, so it stays put
+    squareButton.setAttribute("aria-pressed", state.isSquared);
+    try { localStorage.setItem("domeViz.isSquared", state.isSquared); } catch {}
     requestDraw();
   };
 

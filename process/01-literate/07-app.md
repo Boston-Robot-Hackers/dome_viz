@@ -110,17 +110,23 @@ When the socket closes, `connect` runs again a second later, forever. **The page
 Every drawing routine goes through two functions:
 
 ```javascript
-const toScreen = (x, y) => [
-  stage.clientWidth / 2 + (x - state.cx) * state.scale,
-  stage.clientHeight / 2 - (y - state.cy) * state.scale,
-];
+const viewRot = () => (state.isSquared && world.plan ? -world.plan.angle_rad : 0);
+const toScreen = (x, y) => {
+  const rot = viewRot(), c = Math.cos(rot), s = Math.sin(rot);
+  const dx = x - state.cx, dy = y - state.cy;
+  return [
+    stage.clientWidth / 2 + (dx * c - dy * s) * state.scale,
+    stage.clientHeight / 2 - (dx * s + dy * c) * state.scale,
+  ];
+};
 ```
 
-`toWorld` is its exact inverse. Three choices are built into it:
+`toWorld` is its exact inverse; a numeric round trip at several angles comes back within 10⁻¹⁵. Four choices are built into it:
 
-- **The view centre, not a corner, is the anchor.** Resizing the window keeps what you were looking at in the middle.
+- **The view centre, not a corner, is the anchor.** Resizing the window keeps what you were looking at in the middle, and the Square up turn pivots there too, so toggling it leaves the same spot in the middle.
 - **The minus on `y`** is the one place the coordinate systems meet. Map y points up, as ROS has it; canvas y points down. Nothing else in the file needs to know.
-- **It is a pure scale and offset, with no rotation**, so the grid's lines stay axis-aligned. F02 ("square up the map") will add a rotation here, and the grid is meant to rotate with it.
+- **One rotation, `viewRot`, squares the room up** (F02). It turns the view by minus the room's wall angle, so the walls run across and down the screen. Map coordinates never change: every number on screen stays in the `map` frame, and the grid turns with the map rather than staying aligned to the window.
+- **Everything else asks the transform** rather than doing its own arithmetic, which is what lets one rotation reach the whole page. The pieces that had to change are listed below.
 
 ### Zooming toward the pointer
 
@@ -129,11 +135,11 @@ The wheel zooms toward whatever is under the cursor. `zoomAt` records the world 
 ```javascript
 const [wx, wy] = toWorld(sx, sy);
 state.scale = clampScale(state.scale * factor);
-state.cx = wx - (sx - stage.clientWidth / 2) / state.scale;
-state.cy = wy + (sy - stage.clientHeight / 2) / state.scale;
+const [nx, ny] = toWorld(sx, sy);
+state.cx += wx - nx; state.cy += wy - ny;
 ```
 
-That is `toScreen` rearranged with the screen point fixed. `Math.exp(-deltaY * .0015)` makes zoom *multiplicative*: equal wheel movements give equal ratios, so zooming in and back out returns you to the same scale. `clampScale` limits it to 15–600 px/m.
+Rather than rearranging `toScreen` by hand, it asks `toWorld` again at the new scale and shifts the centre by the difference. That stays exact whatever the rotation. `Math.exp(-deltaY * .0015)` makes zoom *multiplicative*: equal wheel movements give equal ratios, so zooming in and back out returns you to the same scale. `clampScale` limits it to 15–600 px/m.
 
 **When Follow is on, the centre is not moved.** The robot owns the centre then, and zoom happens around it.
 
@@ -141,7 +147,7 @@ That is `toScreen` rearranged with the screen point fixed. `Math.exp(-deltaY * .
 
 Pointer events cover the mouse, touch and pen in one code path. `pointers` maps each active pointer to its last position:
 
-- **One pointer pans.** The centre moves against the drag, divided by the scale so the map tracks the finger exactly.
+- **One pointer pans.** The centre moves by the map distance between the previous and current pointer positions, both found with `toWorld`, so the map tracks the finger exactly even when the view is turned.
 - **Two pointers pinch.** The scale is the starting scale times the ratio of the current finger spread to the starting spread.
 
 **Any drag turns Follow off.** Otherwise the next pose would snap the view straight back, and the drag would seem to have done nothing. That was step 4 of TF01.7's checklist.
@@ -151,6 +157,8 @@ Pointer events cover the mouse, touch and pen in one code path. `pointers` maps 
 ### Fit
 
 `fit` frames the *known* cells, not the whole grid. The SLAM grid is usually far larger than what has been explored, so framing the grid would leave the room as a speck. It scans every cell, takes the bounding box of the free ones, and leaves 80 px of horizontal and 120 px of vertical margin for the controls.
+
+**The box is taken in the turned frame**, as the screen will show it: each cell is rotated before it is measured, and the box's centre is rotated back into `map` metres. A box measured in `map` axes would frame a tilted room badly, off-centre or clipped.
 
 It runs by itself only on the **first** floor plan. Later maps leave the view alone, because the user may have moved it.
 
@@ -231,7 +239,21 @@ Several pieces choose a "nice" value from a fixed list, based on the current sca
 
 - **Grid step**: the first of 0.5, 1, 2, 5 or 10 m that makes cells at least 46 px apart.
 - **Scale bar**: the first of 25 cm up to 10 m that is at least 66 px wide. Its width and label are always set together, which was checklist step 5.
-- **Line widths** take a floor in pixels and otherwise follow the scale, so walls stay visible zoomed out but don't turn into slabs zoomed in.
+- **Line widths** take a floor in pixels and otherwise follow the scale, so walls stay visible zoomed out but don't turn into slabs zoomed in. Walls are `max(1 px, 2 cm)` in light steel blue (`--wall`), set by eye after the first, near-black 7 cm version read as too heavy.
+
+### What the rotation touched
+
+Most drawing goes through `toScreen` and turns for free. Five things had their own idea of "up" and needed the turn added:
+
+- **The floor raster** is an axis-aligned image, so it is drawn under `ctx.rotate(-viewRot())` about its top-left corner.
+- **The grid** draws map-x and map-y lines across the bounds of all four screen corners, and labels each where it crosses the top or left edge, found by walking along that edge in map coordinates.
+- **The origin arrows** point along the turned x and y axes.
+- **The robot** rotates by its yaw plus the view's turn.
+- **`bringIntoView`** finds the new centre with `toWorld`, so the gentle pan heads the right way.
+
+Clutter and wall-cell squares are left screen-aligned: at a few pixels across, turning them would cost a `ctx.rotate` per square for no visible gain.
+
+**The Square up button** sets `state.isSquared`, and keeps the choice in `localStorage` so it survives a reload. It is a per-viewer preference, not robot state, so browser storage is the right home; every read and write is wrapped in try/catch, because storage can be blocked, and the view works without it.
 
 Lines are drawn at `Math.round(x) + .5`. A 1 px line centred on a pixel boundary spreads over two pixels at half strength, so the half-pixel offset is what keeps grid lines crisp.
 
@@ -259,4 +281,4 @@ The pan runs for 350 ms with a *cubic ease-out*, `1 − (1 − t)³`, which star
 1. **`css()` is called dozens of times per frame.** Each call runs `getComputedStyle` and reads a custom property; `drawRobot` alone makes five. Caching the colours in an object, refreshed when `themeKey` changes, would remove that from every frame at no cost in clarity.
 2. **The trail is stroked one segment at a time**, up to 2000 `stroke()` calls per repaint, because every segment has its own opacity. Grouping segments into about ten opacity bands, one path per band, would look the same and be far cheaper on long runs.
 3. **`fit` scans the whole grid** to find the known cells. That's fine once per first map, but the bridge already holds the same grid in numpy, where the bounds are a one-line `nonzero()`; sending them in `floor_plan` would make `fit` trivial.
-4. **The file is 542 lines and holds four concerns**: the raster, the transform, drawing, and input. The parked app.js split chore would likely give the raster pipeline its own file first, since it is the self-contained part.
+4. **The file is 580 lines and holds four concerns**: the raster, the transform, drawing, and input. The app.js split chore, no longer blocked now that F02 has landed, would likely give the raster pipeline its own file first, since it is the self-contained part.

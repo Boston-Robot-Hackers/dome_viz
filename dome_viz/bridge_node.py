@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # bridge_node — ROS adapter that feeds the dome_viz web page
 # Author: Pito Salas and Claude Code
-# Version: 4
+# Version: 5
 # Created: 2026-11-14
-# Updated: 2026-11-15
+# Updated: 2026-11-16
 # Open Source Under MIT license
 """ROS 2 node that turns the robot's topics into messages for the web page.
 
@@ -20,6 +20,12 @@ thread the moment a page opens.
   `map -> odom` to place it. A lookup that fails, **or that answers only with
   a transform older than TF_STALE_S**, is skipped rather than guessed at — see
   `lookup`.
+- **A scan waits for its transform.** `/scan` is stamped ~45 ms ahead of
+  the newest `map -> laser` transform, so looking it up at its own stamp at
+  once almost always extrapolates. The newest scan is held in `pending_scan`
+  and retried on the pose timer until TF reaches its stamp; a newer scan
+  replaces it. A blocking wait cannot work: the TF listener shares this
+  single-threaded executor.
 - **The camera costs the Pi nothing while nobody watches it.** The
   subscription exists only while some page has the panel on. The server's
   callback merely records the wish; `reconcile_camera` on the pose timer
@@ -168,6 +174,7 @@ class BridgeNode(Node):
         self.view = ViewState(self.profiles(profile_path))
         self.is_camera_wanted = False
         self.camera_subscription = None
+        self.pending_scan: LaserScan | None = None
 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
@@ -261,11 +268,20 @@ class BridgeNode(Node):
         self.feed(self.view.on_speed, math.hypot(linear.x, linear.y))
 
     def take_scan(self, scan: LaserScan) -> None:
+        self.pending_scan = scan
+        self.resolve_scan()
+
+    def resolve_scan(self) -> None:
+        """Send the pending scan once TF can place the laser at its stamp."""
+        scan = self.pending_scan
+        if scan is None:
+            return
         lidar_in_map = self.lookup(
             MAP_FRAME, scan.header.frame_id, Time.from_msg(scan.header.stamp)
         )
         if lidar_in_map is None:
             return
+        self.pending_scan = None
         self.feed(self.view.on_scan, lidar_in_map, scan_of(scan))
 
     def take_camera(self, image: CompressedImage) -> None:
@@ -274,6 +290,7 @@ class BridgeNode(Node):
 
     def push_pose(self) -> None:
         self.reconcile_camera()
+        self.resolve_scan()
         latest = Time()
         robot_in_odom = self.lookup(ODOM_FRAME, ROBOT_FRAME, latest)
         map_from_odom = self.lookup(MAP_FRAME, ODOM_FRAME, latest)

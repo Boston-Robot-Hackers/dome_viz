@@ -75,7 +75,9 @@ The page turns the state into a plain sentence. The run's elapsed time goes out 
 
 ## The floor plan on the wire
 
-The floor grid goes out as **base64 bytes**, one byte per cell, row 0 at the lowest y. JSON arrays of numbers would be several times larger. Walls and clutter go as plain coordinate lists, since there are few of them.
+The floor grid goes out as **base64 bytes**, one byte per cell, row 0 at the lowest y. JSON arrays of numbers would be several times larger. Walls, wall cells and clutter go as plain coordinate lists, since there are few of them.
+
+The message also carries `angle_rad`, the room's wall direction, but **wrapped by `view_angle_rad`**. The planner reports an angle from 0 to 90 degrees, because walls repeat every quarter turn. Taken as is, a room at 80 degrees would swing the view nearly a quarter turn; wrapped to plus or minus 45 degrees it turns by -10 instead, the smallest turn that squares the same walls. The wrap lives here, at the wire, because it is a display choice: the floor plan keeps the planner's own number.
 
 ## Observations
 

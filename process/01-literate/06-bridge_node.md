@@ -126,6 +126,22 @@ A pleasing side effect: the check is meaningful at *both* call sites despite mea
 
 The laser follows the same pattern but asks at the scan's *own* stamp, `Time.from_msg(scan.header.stamp)`, so rays are placed where the lidar was when it swept, not where the robot is now.
 
+### A scan waits for its transform
+
+Asking at the scan's own stamp has a cost: **`/scan` arrives before TF reaches it.** On `viz01` each scan was stamped about 45 ms after the newest `map -> laser` transform, so looking it up on arrival was asking `tf2` about the future, and it raised `ExtrapolationException`. A probe counted 24 of 647 scans resolved; the page showed a scan every 20 s or so, and the rays trailed far behind the robot.
+
+The obvious cure, a lookup with a timeout, cannot work here. The `TransformListener` is built with the default `spin_thread=False`, so transforms arrive on the same single-threaded executor as the scan callback. A wait inside the callback would block the very messages it is waiting for.
+
+So the scan waits instead of the thread:
+
+```python
+def take_scan(self, scan: LaserScan) -> None:
+    self.pending_scan = scan
+    self.resolve_scan()
+```
+
+`resolve_scan` tries the pending scan's lookup and, only on success, clears it and feeds `on_scan`. It runs on arrival and again on every 10 Hz pose timer tick, by which time TF has usually caught up. A newer scan simply replaces an unresolved one: only the latest matters, and `ViewState` would throttle the rest anyway. Rays now trail the robot by about a timer tick, placed where the lidar really was.
+
 ## The camera, and a thread you must not touch
 
 The project's governing constraint is that the viewer must cost the Pi nothing when nobody is looking (`notes.md`, "Keep the Pi's load unchanged"). `dome_vision` only encodes images when something subscribes, so the bridge subscribes **only while a page has the panel open**.

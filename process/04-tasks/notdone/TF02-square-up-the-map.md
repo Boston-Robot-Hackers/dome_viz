@@ -37,7 +37,7 @@ currently specifies x right and y up.
 
 ## TF02.1 — Carry the angle to the page
 
-**Status**: not done
+**Status**: done 2026-11-16. `FloorPlan.angle_rad` is the planner's angle (0.0 until it has one). The message sends `view_angle_rad` of it: wrapped from 0 to pi/2 into plus or minus pi/4, so the view always takes the smallest turn — a room at 80 degrees turns by -10, not 80. Tests: `test_rotated_room_segments_follow_its_angle` (extended), `test_a_map_with_no_wall_reports_angle_zero`, `test_floor_plan_message_encodes_floor` (extended), `test_view_angle_is_the_smallest_turn`.
 
 **Description**: `FloorPlan` gains an `angle_rad` field, set from
 `FloorPlanner.angle_rad`; `floor_plan_message` adds it as `angle_rad` (0.0
@@ -50,7 +50,7 @@ the `floor_plan` message carries it.
 
 ## TF02.2 — Rotate the view
 
-**Status**: not done
+**Status**: done 2026-11-16 except one check. **User checked on a `viz01` replay**: walls square, drag without drift, wheel zoom about the pointer, Fit map in both modes, the toggle keeps the robot against the walls, labels read right — all pass. **Deferred to the next live session**: selecting an off-screen object pans it gently into view (needs targets, which plain `viz01` lacks). One rotation, `viewRot()`, inside `toScreen`/`toWorld`; the raster is drawn under `ctx.rotate`; `drawGrid` draws map-x/y lines over the four corners' bounds and labels them where they cross the top and left edges; the origin arrows and the robot's heading add the turn; `fit` takes bounds in the turned frame; pan and wheel zoom go through `toWorld` so they stay exact; `bringIntoView` uses `toWorld` too. **Clutter and wall-cell squares stay screen-aligned** — they are at most a few pixels across, so turning them is not worth the cost.
 
 **Description**: In `app.js`, apply the angle in the view transform so every
 drawing routine inherits it:
@@ -72,7 +72,7 @@ to the walls as the toggle flips.
 
 ## TF02.3 — The toggle
 
-**Status**: not done
+**Status**: done 2026-11-16, user checked: the button matches the view and survives a reload. A `Square up` button after Laser, `aria-pressed`, on by default; the choice is kept in `localStorage` under `domeViz.isSquared`, wrapped in try/catch so the view works without storage. The view turns about its centre, so toggling leaves the same spot in the middle.
 
 **Description**: A **Square up** button in the map controls, beside Laser,
 pressed by default. Off returns the view to true `map` orientation. Remember
@@ -84,7 +84,7 @@ survives a reload.
 
 ## TF02.4 — Test suite
 
-**Status**: not done
+**Status**: done 2026-11-16 except the deferred TF02.2 check. TF02.1's tests exist and pass (97), `ruff` clean; manual results recorded above. **F02 closes after that check.**
 
 **Description**: Make sure TF02.1's tests exist and pass, `ruff` is clean,
 and the manual steps from TF02.2 and TF02.3 are recorded in `current.md` with
