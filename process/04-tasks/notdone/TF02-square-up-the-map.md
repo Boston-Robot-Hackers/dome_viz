@@ -1,5 +1,7 @@
 # TF02 Square up the map, for Feature F02
 
+**Date Created:** 2026-11-15
+
 For each task step, add a test when feasible. If not feasible, note why.
 
 **Shape**: the angle already exists in `FloorPlanner.angle_rad`. Carry it
@@ -9,11 +11,13 @@ routine already goes through.
 
 ## TF02.0 — Decide what the grid does
 
-**Status**: done 2026-11-15 — **the grid rotates with the map** (user's
-call). Every number on screen therefore stays honest: `0, 0`, the axis
-arrows and the edge labels all keep meaning `map` x and y, at the cost of
-grid lines sitting a few degrees off the window edges. `layout.md`'s Map
-section updated.
+**Status**: done 2026-11-15. **The grid rotates with the map** (user's
+call).
+
+- Every number on screen stays honest: `0, 0`, the axis arrows and the edge
+  labels all keep meaning `map` x and y.
+- The cost: grid lines sit a few degrees off the window edges.
+- `layout.md`'s Map section is updated.
 
 **Description**: Settle the one open question in F02: with the view rotated,
 does the coordinate grid rotate with the map, or stay screen-aligned?
@@ -37,7 +41,19 @@ currently specifies x right and y up.
 
 ## TF02.1 — Carry the angle to the page
 
-**Status**: done 2026-11-16. `FloorPlan.angle_rad` is the planner's angle (0.0 until it has one). The message sends `view_angle_rad` of it: wrapped from 0 to pi/2 into plus or minus pi/4, so the view always takes the smallest turn — a room at 80 degrees turns by -10, not 80. Tests: `test_rotated_room_segments_follow_its_angle` (extended), `test_a_map_with_no_wall_reports_angle_zero`, `test_floor_plan_message_encodes_floor` (extended), `test_view_angle_is_the_smallest_turn`.
+**Status**: done 2026-11-16.
+
+### What was done
+
+- **`FloorPlan.angle_rad`** is the planner's angle, 0.0 until it has one.
+- **The message sends `view_angle_rad` of it**, wrapped from 0 to pi/2 into
+  plus or minus pi/4, so the view always takes the smallest turn: a room at
+  80 degrees turns by -10, not 80.
+- **Tests**:
+  - `test_rotated_room_segments_follow_its_angle` (extended);
+  - `test_a_map_with_no_wall_reports_angle_zero`;
+  - `test_floor_plan_message_encodes_floor` (extended);
+  - `test_view_angle_is_the_smallest_turn`.
 
 **Description**: `FloorPlan` gains an `angle_rad` field, set from
 `FloorPlanner.angle_rad`; `floor_plan_message` adds it as `angle_rad` (0.0
@@ -50,7 +66,35 @@ the `floor_plan` message carries it.
 
 ## TF02.2 — Rotate the view
 
-**Status**: done 2026-11-16 except one check. **User checked on a `viz01` replay**: walls square, drag without drift, wheel zoom about the pointer, Fit map in both modes, the toggle keeps the robot against the walls, labels read right — all pass. **Deferred to the next live session**: selecting an off-screen object pans it gently into view (needs targets, which plain `viz01` lacks). One rotation, `viewRot()`, inside `toScreen`/`toWorld`; the raster is drawn under `ctx.rotate`; `drawGrid` draws map-x/y lines over the four corners' bounds and labels them where they cross the top and left edges; the origin arrows and the robot's heading add the turn; `fit` takes bounds in the turned frame; pan and wheel zoom go through `toWorld` so they stay exact; `bringIntoView` uses `toWorld` too. **Clutter and wall-cell squares stay screen-aligned** — they are at most a few pixels across, so turning them is not worth the cost.
+**Status**: done 2026-11-16, except one check deferred to the next live
+session.
+
+### What was done
+
+- **One rotation, `viewRot()`**, inside `toScreen` and `toWorld`.
+- **The raster** is drawn under `ctx.rotate`.
+- **`drawGrid`** draws map-x and map-y lines over the four corners' bounds,
+  and labels them where they cross the top and left edges.
+- **The origin arrows and the robot's heading** add the turn.
+- **`fit`** takes its bounds in the turned frame.
+- **Pan, wheel zoom and `bringIntoView`** go through `toWorld`, so they stay
+  exact.
+- **Clutter and wall-cell squares stay screen-aligned.** They are a few
+  pixels across, so turning them is not worth the cost.
+
+### What was checked
+
+On a `viz01` replay, by the user, all passing:
+
+- walls run square;
+- dragging does not drift;
+- wheel zoom stays about the pointer;
+- Fit map frames the room in both modes;
+- the toggle keeps the robot against the walls;
+- the grid labels read right.
+
+**Deferred to the next live session**: selecting an off-screen object pans
+it gently into view. It needs targets, which plain `viz01` lacks.
 
 **Description**: In `app.js`, apply the angle in the view transform so every
 drawing routine inherits it:
@@ -72,7 +116,16 @@ to the walls as the toggle flips.
 
 ## TF02.3 — The toggle
 
-**Status**: done 2026-11-16, user checked: the button matches the view and survives a reload. A `Square up` button after Laser, `aria-pressed`, on by default; the choice is kept in `localStorage` under `domeViz.isSquared`, wrapped in try/catch so the view works without storage. The view turns about its centre, so toggling leaves the same spot in the middle.
+**Status**: done 2026-11-16. The user checked that the button matches the
+view and that the choice survives a reload.
+
+### What was done
+
+- **A `Square up` button** after Laser, `aria-pressed`, on by default.
+- **The choice is kept in `localStorage`** under `domeViz.isSquared`,
+  wrapped in try/catch so the view works without storage.
+- **The view turns about its centre**, so toggling leaves the same spot in
+  the middle.
 
 **Description**: A **Square up** button in the map controls, beside Laser,
 pressed by default. Off returns the view to true `map` orientation. Remember
@@ -84,7 +137,11 @@ survives a reload.
 
 ## TF02.4 — Test suite
 
-**Status**: done 2026-11-16 except the deferred TF02.2 check. TF02.1's tests exist and pass (97), `ruff` clean; manual results recorded above. **F02 closes after that check.**
+**Status**: done 2026-11-16, except the deferred TF02.2 check.
+
+- TF02.1's tests exist and pass (97 in all), and `ruff` is clean.
+- The manual results are recorded in TF02.2 and TF02.3.
+- **F02 closes after the deferred check.**
 
 **Description**: Make sure TF02.1's tests exist and pass, `ruff` is clean,
 and the manual steps from TF02.2 and TF02.3 are recorded in `current.md` with
