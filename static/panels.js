@@ -47,9 +47,9 @@
       : seconds < 60 ? `${Math.round(seconds)} s ago`
       : `${Math.round(seconds / 60)} min ago`;
 
-  const oldestAge = (ages) => {
+  const newestAge = (ages) => {
     const known = Object.values(ages).filter((age) => age != null);
-    return known.length ? Math.max(...known) : null;
+    return known.length ? Math.min(...known) : null;
   };
 
   // ---- object markers over the map ---------------------------------------
@@ -227,7 +227,7 @@
     element.dataset.state = status?.state ?? "not_connected";
     const sub = status?.state === "live" ? `· map updated ${since(ages.map)}`
       : status?.state === "waiting_for_map" ? "· robot connected"
-      : status ? `· last heard ${since(oldestAge(ages))}` : "";
+      : status ? `· last heard ${since(newestAge(ages))}` : "";
     line.innerHTML = `<span class="dot"></span><span>${
       WORDING[status?.state] ?? "Connecting…"}</span><span class="sub">${sub}</span>`;
     line.setAttribute("aria-expanded", isStatusOpen);

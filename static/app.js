@@ -420,10 +420,12 @@
   // ---- pan, zoom, pinch and the buttons -----------------------------------
   const pointers = new Map();
   let pinchStart = null;
+  let hasDragged = false;   // a drag ends in a click the map must ignore
 
   stage.addEventListener("pointerdown", (event) => {
     if (event.target.closest(".controls")) return;
     stage.setPointerCapture(event.pointerId);
+    if (!pointers.size) hasDragged = false;
     pointers.set(event.pointerId, [event.clientX, event.clientY]);
     stage.classList.add("dragging");
     if (pointers.size === 2) {
@@ -441,6 +443,7 @@
       state.scale = clampScale(pinchStart.scale * span / pinchStart.span);
     } else {
       setFollow(false);
+      hasDragged = true;
       state.cx -= (event.clientX - previous[0]) / state.scale;
       state.cy += (event.clientY - previous[1]) / state.scale;
     }
@@ -514,6 +517,7 @@
   };
 
   stage.addEventListener("click", (event) => {
+    if (hasDragged) return;
     if (state.selected && !event.target.closest(".controls, .marker")) {
       api.select(state.selected);           // clicking empty map deselects
     }

@@ -1,8 +1,8 @@
-# I02 A backwards clock makes ages negative, and a wrong clock hides the robot
+# I02 A backwards or stopped clock misreports ages, and a wrong clock hides the robot
 
 ## Symptom
 
-Two faces of one cause — the node's clock and the transform stamps
+Three faces of one cause — the node's clock and the transform stamps
 disagreeing.
 
 **1. Negative source ages.** Seen 2026-11-15 while replaying `viz01`:
@@ -27,6 +27,16 @@ The warning's own stamp is wall clock (`1794769047`, today); the data is
 stamped when the bag was recorded (`1794620131`). Every transform looks about
 two days old, so **`bridge_node.lookup`'s `TF_STALE_S` check rejects all of
 them** and the robot is never drawn.
+
+**3. A stopped clock pins the state at live.** Seen 2026-11-16 at the end
+of a `viz01` replay: the bag finished, and the page kept saying "Live" while
+the run ticker stopped. With `/clock` silent, a sim-time node's `now` stops at
+the bag's last stamp, so every source age freezes below `QUIET_S` and nothing
+ever goes stale. **Replay only**: on the robot the bridge is on wall time,
+which keeps running.
+
+It also means the not-connected status line, including "last heard", cannot
+be reached on a replay at all — so that line can only be checked live.
 
 ## Cause
 

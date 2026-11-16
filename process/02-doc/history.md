@@ -95,3 +95,20 @@
   `Received message too long`: the Pi's `~/.bashrc` printed on
   non-interactive sessions, which breaks `rsync`, `scp` and `sftp` alike.
   The `~/rosutils/*.bash` echoes are now guarded with `case $- in *i*)`.
+
+## 2026-11-16
+
+- **TF01.8 done.** The objects half checked by the user against `viz01`
+  replayed with `dome_semantic` live on the VM: pins and chips, selection,
+  lost-object fading, chip collisions and list grouping all pass. Recipe in
+  `current.md`, "Replaying with objects and a floor plan".
+- **Decided: the objects list mirrors `dome_semantic`'s confirmed map**
+  (F01, Decisions). Targets it withdraws vanish from the page.
+- **Two page bugs fixed** (`chores.md`), both found by the literate docs:
+  dragging the map no longer deselects (checked in the browser), and "last
+  heard" reports the newest source age (check deferred to TF01.12, since a
+  replay never leaves "live").
+- **I02 gained a third face**: a stopped `/clock` at the end of a replay pins
+  the state at live.
+- **`/start` slimmed** to read only `current.md`, synced from `~/j3`;
+  `CLAUDE.md` gained the template's "Hazards before any edit" section.

@@ -4,47 +4,37 @@
 
 - **F01, live map view, in progress.** Feature in
   `process/03-features/notdone/`, task file TF01 in `process/04-tasks/notdone/`.
-  **TF01.0–TF01.11 are done**, TF01.8 as far as `viz01` can show it. **Next:
-  check the objects half of TF01.8** against targets (see below), then
-  **TF01.12**, the demo, which needs the robot and you.
+  **TF01.0–TF01.11 are done**, TF01.8's objects half checked by the user on
+  2026-11-16. **Next: TF01.12**, the demo, which needs the robot and you. At the demo, also run the "last heard" chore's manual check (`chores.md`), which a replay cannot reach.
 
 - **93 tests pass**, `ruff` clean on `dome_viz/`, `test/`, `launch/` and
   `setup.py`. `make view` and `make replay` work, both through `bl`
   (`notes.md`, "Launchfiles use `better_launch`").
 
-- **Open issues**: **I02** (`process/05-issues/open/`) — a backwards `/clock`
+- **Open issues**: **I02** (`process/05-issues/open/`) — a backwards or stopped `/clock`
   makes source ages negative, and a wrong clock now hides the robot
   completely and silently. Read it before touching `lookup` or the status
   logic. **F02 + TF02** are filed and *not approved*: squaring up the map, with
   the grid-rotates-with-the-map decision already made.
 
-### TF01.8 — the objects half is still unchecked
+### Replaying with objects and a floor plan
 
-The sidebar was checked against a live `viz01` replay and approved: camera
-panel, the four graphs, the status line and the responsive collapse all look
-right.
-
-**But the objects list was necessarily empty**, because `viz01` has no
-`/semantic/targets`. So these are still unverified, and they are half the
-point of the feature:
-
-- A pin plus a chip with the class icon and short ID, readable at any zoom.
-- Clicking a chip or a list row selects it, shows the detail block, and pans
-  **only** if the object was off-screen — never zooming. A second click
-  deselects; clicking empty map deselects.
-- Lost objects faded with a dashed outline, **never hidden**.
-- Where chips would collide, only the pin shows.
-- The list groups "In view now" above "Seen earlier".
-
-Two ways to get targets on screen:
+**TF01.8's objects half passed on 2026-11-16** this way: three terminals on
+the VM, robot stack off. `dome_semantic`'s launchfile has no sim-time
+argument, so the node runs through `ros2 run`. Use a fresh `map_name` each
+time, or `~/.dome/semantic_maps/<name>.json` is restored at startup.
 
 ```
-make replay BAG=~/.dome/bags/f36run6      # 630 targets, but no /map
+bl dome_viz view.launch.py --sim_time True
+ros2 run dome_semantic semantic_map_node --ros-args -r __node:=semantic_map \
+  -p use_sim_time:=true -p map_name:=<fresh_name> \
+  -p class_profile_path:=$(ros2 pkg prefix dome_semantic)/share/dome_semantic/config/class_profiles.yaml \
+  --params-file $(ros2 pkg prefix dome_semantic)/share/dome_semantic/config/semantic_map.yaml
+ros2 bag play ~/.dome/bags/viz01 --clock
 ```
 
-or run `dome_semantic` against the `viz01` replay, which regenerates targets
-from its `/oak/detections_3d` — that is how `test/fixtures/viz01replay.json`
-was made, and it is the only way to see objects **and** a floor plan at once.
+**Targets flicker early in the run**: `dome_semantic` confirms some, then
+withdraws them, and the page mirrors that by design (F01, Decisions).
 
 ### The map checklist, to re-run after changes
 
@@ -173,7 +163,4 @@ running `dome_semantic` live against the replay regenerates them (that is how
 - **Literate docs** cover every module: `01`-`06` for Python, **`07-app`
   and `08-panels` for the page** (added 2026-11-15, after the prompt and
   `process.md` were widened to JavaScript, here and in `~/j3`), plus
-  appendices `X01` and `X02`. Their closing observations list two likely
-  page bugs worth a chore each: panning probably deselects the selected
-  object (`07`, obs. 3), and "last heard" reports the *oldest* source age
-  instead of the newest (`08`, obs. 1).
+  appendices `X01` and `X02`.

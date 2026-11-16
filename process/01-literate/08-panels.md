@@ -141,7 +141,7 @@ The line reads one of three states from `ViewState`, plus a short sub-clause:
 | --- | --- | --- |
 | `live` | Live | map updated *since(map)* |
 | `waiting_for_map` | Waiting for the map | robot connected |
-| `not_connected` | Robot not connected | last heard *since(oldest age)* |
+| `not_connected` | Robot not connected | last heard *since(newest age)* |
 
 There is a fourth case before any of these: **the socket to the viewer itself is closed.** That says "Not connected to the viewer", which is a different fault from the robot being gone, so it has different wording.
 
@@ -185,7 +185,6 @@ The tooltip finds the last point at or before the pointer, with a linear scan. I
 
 ## Observations
 
-1. **"Last heard" shows the oldest source, not the most recent one.** `oldestAge` takes the *maximum* age. When the robot is offline, the useful fact is when *anything* was last heard, which is the minimum. With a camera heard only once, early in the run, the line would currently report that long-ago time. Worth a quick fix and a test.
-2. **The objects list is rebuilt from `innerHTML` every second**, because `tick` sends `targets` at 1 Hz. That discards keyboard focus on the list, the same problem the markers avoid by reusing elements. Reusing rows by ID would fix it, as would skipping the render when nothing visible has changed.
-3. **`placeMarkers` writes `innerHTML` and then reads `offsetWidth` for each marker, on every frame.** Each read forces a layout, so a pan with many objects does n layouts per frame (*layout thrashing*). Doing all the writes first and then all the reads, or caching each chip's width until its label changes, would keep pans smooth.
-4. **The class colours and icons are hard-coded for `can` and `cup`**, while the class profiles already come from `dome_vision_ros`'s YAML. A new class will get the generic icon until someone edits this file. Sending a colour or icon key from the profile would remove that dependency.
+1. **The objects list is rebuilt from `innerHTML` every second**, because `tick` sends `targets` at 1 Hz. That discards keyboard focus on the list, the same problem the markers avoid by reusing elements. Reusing rows by ID would fix it, as would skipping the render when nothing visible has changed.
+2. **`placeMarkers` writes `innerHTML` and then reads `offsetWidth` for each marker, on every frame.** Each read forces a layout, so a pan with many objects does n layouts per frame (*layout thrashing*). Doing all the writes first and then all the reads, or caching each chip's width until its label changes, would keep pans smooth.
+3. **The class colours and icons are hard-coded for `can` and `cup`**, while the class profiles already come from `dome_vision_ros`'s YAML. A new class will get the generic icon until someone edits this file. Sending a colour or icon key from the profile would remove that dependency.

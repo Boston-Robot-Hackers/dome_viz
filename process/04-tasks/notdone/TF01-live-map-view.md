@@ -298,16 +298,17 @@ result in `current.md`. A JS test toolchain isn't worth adding for this.
 
 ## TF01.8 — Page: objects, camera, status
 
-**Status**: done 2026-11-15 for everything `viz01` can show — **the user
-checked the page against a live `viz01` replay and approved it** ("it looks
-good"). **The objects half is still unverified**, see below.
+**Status**: **done 2026-11-16.** The sidebar was checked against a live
+`viz01` replay on 2026-11-15 and approved ("it looks good").
 
-**Not verified, and could not be**: the object markers, the objects list, the
-detail block, selection and the lost-object styling. `viz01` carries no
-`/semantic/targets`, so the list was necessarily empty on screen. To finish
-this off, replay `f36run6` (630 target messages, but no `/map`, so no floor
-plan) or run `dome_semantic` against the `viz01` replay. Worth doing before
-TF01.12's demo, since the objects list is half the point of the feature.
+**The objects half was checked on 2026-11-16**, by the user, against `viz01`
+replayed with `dome_semantic` running live on the VM (sim time, fresh
+`map_name`). Pins and chips, selection and deselection, lost-object fading,
+chip collisions and the list grouping all passed.
+
+**Seen during that run, and left as is (user, 2026-11-16)**: targets that
+`dome_semantic` confirms and later withdraws vanish from the page, because
+the viewer mirrors each published array. See F01's Decisions.
 
 `static/panels.js` (416 lines) plus the sidebar in `index.html` and its
 styles. It owns the object markers, the objects list and detail block, the

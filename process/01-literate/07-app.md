@@ -146,6 +146,8 @@ Pointer events cover the mouse, touch and pen in one code path. `pointers` maps 
 
 **Any drag turns Follow off.** Otherwise the next pose would snap the view straight back, and the drag would seem to have done nothing. That was step 4 of TF01.7's checklist.
 
+**A drag must not also count as a click.** The browser ends every drag with a `click` on the stage, and the stage's click handler deselects. So a pan sets `hasDragged`, the next `pointerdown` clears it, and the click handler returns early while it is set. Without it, panning around a selected object threw the selection away.
+
 ### Fit
 
 `fit` frames the *known* cells, not the whole grid. The SLAM grid is usually far larger than what has been explored, so framing the grid would leave the room as a speck. It scans every cell, takes the bounding box of the free ones, and leaves 80 px of horizontal and 120 px of vertical margin for the controls.
@@ -256,6 +258,5 @@ The pan runs for 350 ms with a *cubic ease-out*, `1 − (1 − t)³`, which star
 
 1. **`css()` is called dozens of times per frame.** Each call runs `getComputedStyle` and reads a custom property; `drawRobot` alone makes five. Caching the colours in an object, refreshed when `themeKey` changes, would remove that from every frame at no cost in clarity.
 2. **The trail is stroked one segment at a time**, up to 2000 `stroke()` calls per repaint, because every segment has its own opacity. Grouping segments into about ten opacity bands, one path per band, would look the same and be far cheaper on long runs.
-3. **Panning probably deselects the selected object.** A drag ends with a `click` event on the stage, and the click handler deselects on any click that isn't on a control or marker. Unverified in a browser. The fix is to ignore a click that ends a drag of more than a few pixels. It belongs with the TF01.8 objects check.
-4. **`fit` scans the whole grid** to find the known cells. That's fine once per first map, but the bridge already holds the same grid in numpy, where the bounds are a one-line `nonzero()`; sending them in `floor_plan` would make `fit` trivial.
-5. **The file is 538 lines and holds four concerns**: the raster, the transform, drawing, and input. The parked app.js split chore would likely give the raster pipeline its own file first, since it is the self-contained part.
+3. **`fit` scans the whole grid** to find the known cells. That's fine once per first map, but the bridge already holds the same grid in numpy, where the bounds are a one-line `nonzero()`; sending them in `floor_plan` would make `fit` trivial.
+4. **The file is 542 lines and holds four concerns**: the raster, the transform, drawing, and input. The parked app.js split chore would likely give the raster pipeline its own file first, since it is the self-contained part.

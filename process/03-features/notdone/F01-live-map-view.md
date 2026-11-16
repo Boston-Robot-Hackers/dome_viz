@@ -74,6 +74,10 @@ topics, not a debugging tool.**
   publishes the image when someone is subscribed, so a closed panel costs the
   Pi nothing.
 - **Read-only.** The page never publishes anything to the robot.
+- **The objects list mirrors `dome_semantic`'s confirmed map** (user,
+  2026-11-16). A target `dome_semantic` withdraws disappears from the page;
+  "lost, shown faded" means a target still published but not seen recently.
+  The viewer keeps no memory of targets the robot no longer believes in.
 
 ## Out of scope
 
