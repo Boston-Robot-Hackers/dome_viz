@@ -23,6 +23,21 @@ view.launch.py`, matching `bl dome2 robot.launch.py` and the rest. The first
 version of `view.launch.py` used `LaunchDescription` and
 `DeclareLaunchArgument`; it was rewritten.
 
+**`better_launch` is never to be modified** (user, 2026-11-15). It is a
+third-party package in `~/ros2_ws/src`; read it to learn its API, and work
+around its behaviour in our own code. Everything about a launch problem gets
+fixed in `dome_viz`.
+
+**Do not name a launch argument `use_sim_time`.** It collides with
+`better_launch`'s own `--use-sim-time` switch: the declared argument is then
+silently never populated, the node runs on wall time, every TF lookup is
+stale, and the robot and laser vanish with nothing in the log. **Their own
+`--use-sim-time` switch does not help either**: tried on 2026-11-15, the
+node's command line carried no `use_sim_time` at all. So the launchfile
+declares its own argument, **`sim_time`**, and passes it through `params` as
+`use_sim_time`; on the command line that is **`--sim_time True`**.
+`test_launch.py` guards both the name and the wiring.
+
 **How to apply**: a launchfile is a `@launch_this`-decorated function whose
 typed parameters *are* the launch arguments, with a numpydoc docstring whose
 `Parameters` section becomes their help text. Arguments arrive as real
@@ -30,10 +45,10 @@ values, so no substitutions:
 
 ```python
 @launch_this
-def view(use_sim_time: bool = False, host: str = "0.0.0.0", port: int = 8080):
+def view(sim_time: bool = False, host: str = "0.0.0.0", port: int = 8080):
     bl = BetterLaunch()
     bl.node("dome_viz", "bridge_node", "dome_viz_bridge",
-            params={"host": host, "port": port}, use_sim_time=use_sim_time)
+            params={"host": host, "port": port, "use_sim_time": sim_time})
 ```
 
 On the command line the arguments are `--port 8094`, not `port:=8094`.
@@ -70,7 +85,7 @@ disabled when it was recorded.
 **To replay it** into the viewer, from the VM:
 
 ```
-bl dome_viz view.launch.py --use_sim_time True
+bl dome_viz view.launch.py --sim_time True
 ros2 bag play ~/.dome/bags/viz01 --clock
 ```
 

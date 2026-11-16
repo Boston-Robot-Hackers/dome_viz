@@ -8,7 +8,7 @@
   check the objects half of TF01.8** against targets (see below), then
   **TF01.12**, the demo, which needs the robot and you.
 
-- **87 tests pass**, `ruff` clean on `dome_viz/`, `test/`, `launch/` and
+- **93 tests pass**, `ruff` clean on `dome_viz/`, `test/`, `launch/` and
   `setup.py`. `make view` and `make replay` work, both through `bl`
   (`notes.md`, "Launchfiles use `better_launch`").
 
@@ -53,7 +53,7 @@ procedure to re-run after TF01.8's objects work and after F02, since both
 change what is drawn.
 
 ```
-bl dome_viz view.launch.py --use_sim_time True
+bl dome_viz view.launch.py --sim_time True
 ros2 bag play ~/.dome/bags/viz01 --clock
 ```
 
@@ -170,8 +170,10 @@ running `dome_semantic` live against the replay regenerates them (that is how
 - **Noticed on the Pi, outside this project**: `~/.bashrc` exports
   `ROBOFLOW_API_KEY` in plaintext. Worth moving to an untracked file that
   `.bashrc` sources, since dotfiles tend to end up in repos.
-- **Literate docs** cover every Python module: `01`-`06` plus appendices
-  `X01` (packaging) and `X02` (the launchfile and URL helper). **The page
-  still has none** — `.claude/literate.md`'s prompt is written for Python
-  ("convert the following Python program"), so `app.js` and `panels.js` are
-  undocumented there. Decide whether the prompt should cover JS.
+- **Literate docs** cover every module: `01`-`06` for Python, **`07-app`
+  and `08-panels` for the page** (added 2026-11-15, after the prompt and
+  `process.md` were widened to JavaScript, here and in `~/j3`), plus
+  appendices `X01` and `X02`. Their closing observations list two likely
+  page bugs worth a chore each: panning probably deselects the selected
+  object (`07`, obs. 3), and "last heard" reports the *oldest* source age
+  instead of the newest (`08`, obs. 1).

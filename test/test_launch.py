@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # test_launch — the view launchfile's arguments, and the URLs it prints
 # Author: Pito Salas and Claude Code
-# Version: 1
+# Version: 2
 # Created: 2026-11-15
 # Updated: 2026-11-15
 # Open Source Under MIT license
@@ -60,12 +60,12 @@ def node_call() -> ast.Call:
     return call
 
 
-def test_declares_the_three_arguments():
-    assert set(arguments()) == {"use_sim_time", "host", "port"}
+def test_declares_sim_time_host_and_port():
+    assert set(arguments()) == {"sim_time", "host", "port"}
 
 
 def test_argument_defaults_serve_the_lan_on_8080():
-    assert arguments() == {"use_sim_time": False, "host": "0.0.0.0", "port": 8080}
+    assert arguments() == {"sim_time": False, "host": "0.0.0.0", "port": 8080}
 
 
 def test_it_starts_the_bridge():
@@ -74,14 +74,26 @@ def test_it_starts_the_bridge():
     assert (package, executable) == ("dome_viz", "bridge_node")
 
 
-def test_the_arguments_reach_the_node():
-    """host and port as parameters, use_sim_time as the kwarg node() takes."""
+def test_the_arguments_reach_the_node_as_parameters():
+    """The node parameter is `use_sim_time`; the launch argument feeding it is
+    `sim_time`, and the two names must stay different."""
     call = node_call()
     keywords = {keyword.arg: keyword.value for keyword in call.keywords}
     params = keywords["params"]
-    assert [ast.literal_eval(key) for key in params.keys] == ["host", "port"]
-    assert [value.id for value in params.values] == ["host", "port"]
-    assert keywords["use_sim_time"].id == "use_sim_time"
+    assert [ast.literal_eval(key) for key in params.keys] == [
+        "host",
+        "port",
+        "use_sim_time",
+    ]
+    assert [value.id for value in params.values] == ["host", "port", "sim_time"]
+
+
+def test_no_launch_argument_is_called_use_sim_time():
+    """Regression guard. That name collides with `better_launch`'s own
+    `--use-sim-time` switch, and the declared argument is then silently never
+    populated: the node runs on wall time, every TF lookup is stale, and the
+    robot and laser vanish with nothing in the log."""
+    assert "use_sim_time" not in arguments()
 
 
 def test_page_urls_always_offers_localhost():

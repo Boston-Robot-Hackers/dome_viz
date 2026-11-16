@@ -45,7 +45,7 @@
 * If a project's `.claude/` predates the canonical `j3` kit's current state, flag it as stale and offer to sync, rather than silently working from the old copy.
 
 # github
-* Literate docs: apply `.claude/literate.md`'s prompt to each changed Python module, save as `process/01-literate/<module>.md`.
+* Literate docs: apply `.claude/literate.md`'s prompt to each changed source module (Python, or JavaScript under `static/`), save as `process/01-literate/<module>.md`.
 * Run tests and regenerate literate docs before committing/pushing.
 * File headers stamp themselves: `.githooks/pre-commit` sets `Version`/`Created`/`Updated` on every staged `.py`. Never hand-edit those three fields — see the file-header rule in `.claude/style_guide.md`.
 * The hook is only active once per clone: `git config core.hooksPath .githooks`. Without it headers silently stop updating, so check it after cloning.
