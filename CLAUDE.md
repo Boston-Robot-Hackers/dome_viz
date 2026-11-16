@@ -72,6 +72,18 @@ This checkout may not include required credentials or data files. Before any
 live external-system or data-extract work, check for these and stop with a
 short list of what's missing instead of improvising.
 
+## Hazards before any edit
+
+- Nothing in this package is launched on the robot's Pi — it runs on the viewer VM.
+- Never modify `better_launch`; fix launch problems in `dome_viz`.
+- Never name a launch argument `use_sim_time` — it collides with
+  `better_launch`'s switch; use `sim_time` (`notes.md`).
+- Edits under `static/` reach the browser only after `colcon build` and a hard
+  reload.
+- Never `git add` the replay bags in `~/.dome/bags/` — over GitHub's limit.
+
+Everything else durable goes in `process/02-doc/notes.md`.
+
 ## Write Safety
 
 Treat any live external system (database, API, SaaS platform) as read-only by
