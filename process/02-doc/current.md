@@ -4,10 +4,8 @@
 
 ### Pick up here (2026-11-16, evening)
 
-- **TF01.16 built and committed**: the robot, trail, laser and object
-  markers show from the first odometry, before any map. **Its by-eye check
-  is still to run**: a replay that starts before SLAM (task file lists what
-  to confirm).
+- **TF01.16 done**: the robot, trail, laser and object markers show from
+  the first odometry, before any map. By-eye check passed on a replay.
 - **Decided**: a finished replay freezes at its last moment; objects stay
   "in view" (`notes.md`).
 - **Next after that: the live session** (TF01.12), which needs you and the
@@ -15,9 +13,8 @@
 
 ### Next
 
-- **F01**: then only TF01.12 left, the live demo plus Pi CPU measurements.
+- **F01**: only TF01.12 left, the live demo plus Pi CPU measurements.
 - **F02**: closes after its one deferred check, at the live session.
-- **TF01.16**: run its by-eye check, then it is done.
 - **Warn once when transforms are rejected as stale** (I02's first fix,
   `chores.md`): the wrong clock hid the robot three times today.
 

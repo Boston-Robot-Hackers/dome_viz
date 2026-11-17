@@ -688,7 +688,7 @@ The entries:
 
 ## TF01.16 — Show the robot before the map arrives
 
-**Status**: in progress.
+**Status**: done 2026-11-16.
 
 **Description**: The user asked for the page to start showing things as
 soon as odometry first arrives. Until now the page waited for the first
@@ -731,3 +731,6 @@ The by-eye check must confirm:
 - the robot, trail, laser and origin show before the first map;
 - **object markers show before the first map**, one for each object in the
   list.
+
+Result, 2026-11-16: the user ran it on a replay that starts before SLAM;
+all of the above showed. **Passed.**
