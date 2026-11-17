@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # bridge_node — ROS adapter that feeds the dome_viz web page
 # Author: Pito Salas and Claude Code
-# Version: 6
+# Version: 7
 # Created: 2026-11-14
-# Updated: 2026-11-16
+# Updated: 2026-11-17
 # Open Source Under MIT license
 """ROS 2 node that turns the robot's topics into messages for the web page.
 
@@ -53,6 +53,7 @@ from dome_semantic.class_profiles import build_label_map, load_class_profiles
 from dome_semantic_msgs.msg import SemanticTargetArray
 from dome_telemetry_msgs.msg import BatteryStats
 from nav_msgs.msg import OccupancyGrid, Odometry
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import (
     QoSDurabilityPolicy,
@@ -358,8 +359,8 @@ def main():
     node = BridgeNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
-        node.get_logger().info("Ctrl-C, shutting down")
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass  # Ctrl-C or the launcher's SIGTERM: a normal stop
     finally:
         node.destroy_node()
         rclpy.try_shutdown()

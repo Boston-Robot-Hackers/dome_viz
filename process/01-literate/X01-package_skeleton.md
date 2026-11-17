@@ -15,14 +15,14 @@ only its `main`, which is the package's one console script.
 ```python
 try:
     rclpy.spin(node)
-except KeyboardInterrupt:
-    node.get_logger().info("Ctrl-C, shutting down")
+except (KeyboardInterrupt, ExternalShutdownException):
+    pass  # Ctrl-C or the launcher's SIGTERM: a normal stop
 finally:
     node.destroy_node()
     rclpy.try_shutdown()
 ```
 
-`try_shutdown` rather than `shutdown` avoids an error when a launch file's signal handling has already shut the context down.
+When a launch stops the node, Kilted's rclpy has already shut the context down and `spin()` raises `ExternalShutdownException`. It counts as a normal stop, like Ctrl-C, so no traceback is printed. `try_shutdown` rather than `shutdown` avoids an error in that same case.
 
 ## `setup.py`
 
