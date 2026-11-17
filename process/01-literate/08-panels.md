@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-11-15"
+version: "1.1"
+generated: "2026-11-16"
 ---
 
 # panels.js: everything on the page that isn't the map
@@ -76,7 +76,7 @@ The 5 s cut-off in `ago` is the same as `QUIET_S` and `LOST_TIMEOUT_S` in `view_
 
 The markers are **DOM buttons over the canvas, not canvas drawings**. They get keyboard focus, `aria-label`s and hover styling for free, and a click on one can call `stopPropagation`, so the map's own deselect-on-click never sees it.
 
-They are hidden until a floor plan exists. Pins floating over an empty grid mean nothing. That is also why `f36run6`, which has targets but no `/map`, shows no markers.
+They are **shown whenever the map canvas is**: once a floor plan exists, or before that once the robot is drawn. The gate is `world.plan || world.robot`, the same one app.js uses. An earlier gate on the floor plan alone meant an object could be listed "in view" with no marker, before SLAM was up.
 
 ### Decluttering: a greedy placement
 

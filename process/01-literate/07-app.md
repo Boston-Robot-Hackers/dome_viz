@@ -1,6 +1,6 @@
 ---
-version: "1.0"
-generated: "2026-11-15"
+version: "1.1"
+generated: "2026-11-16"
 ---
 
 # app.js: the live map, from websocket to canvas
@@ -228,10 +228,12 @@ Messages arrive in bursts: a pose, a laser scan and a status can land within mil
 `draw` itself follows the *painter's algorithm*, back to front:
 
 1. Size the canvas for `devicePixelRatio`, so lines stay sharp on a Retina screen, then set the transform so the code can work in CSS pixels.
-2. Draw the floor raster.
-3. Draw the grid, walls and clutter, the origin, the laser, the trail and the robot.
+2. Draw the floor raster, if a map has arrived.
+3. Draw the grid, walls and clutter (map only), the origin, the laser, the trail and the robot.
 4. Draw the scale bar, which is a DOM element and not canvas.
 5. Call `api.onDraw()`, so panels.js can move its markers to match.
+
+**The canvas draws as soon as there is a robot or a map.** Before the first map only the floor and walls are missing: the robot, trail and laser show from the first odometry, placed in `odom`. The first robot pose with no map turns Follow on, so the robot is not off-screen; the first map still frames the view once.
 
 ### Things that adapt to the zoom
 

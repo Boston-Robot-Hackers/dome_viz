@@ -124,3 +124,10 @@
   toggle. Every replay check passed but one, deferred to the live session.
 - **`make view` / `make replay`** now say which clock each uses and refuse
   the mix-ups that silently drew no robot (twice today).
+- **TF01.16 built** (by-eye check still to run): the robot, trail, laser
+  and object markers show from the first odometry, with `odom` standing in
+  for `map` until the run's first map. Markers had been gated on the map
+  alone, so cans listed "in view" had no pin.
+- **Diagnosed a blank page**: a bag played from another machine after
+  `make view` started, so the wall-time bridge rejected every transform as
+  three days stale. Chore logged to warn on this.

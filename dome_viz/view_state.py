@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # view_state — robot data in, the page's JSON messages out
 # Author: Pito Salas and Claude Code
-# Version: 5
+# Version: 6
 # Created: 2026-11-14
 # Updated: 2026-11-16
 # Open Source Under MIT license
@@ -16,6 +16,8 @@ holds a lock around every call.
 **Run start is a quiet gap.** The first robot message ever, or the first one
 after every source has been silent for over RUN_GAP_S, starts a new run: a
 fresh floor planner, trail and graph series, and the run ticker restarts.
+`has_run_map` is cleared too: until this run's first map, the bridge places
+the robot with `odom` standing in for `map`.
 
 Messages, by `type`:
 
@@ -159,6 +161,7 @@ class ViewState:
         self.targets: list = []
         self.robot: dict | None = None
         self.laser_sent_s: float | None = None
+        self.has_run_map = False  # until it is, the bridge uses odom as map
 
     def heard(self, source: str, now_s: float) -> list:
         """Note a message from `source`; start a new run after a quiet gap."""
@@ -167,10 +170,12 @@ class ViewState:
         if last_s is not None and now_s - last_s <= RUN_GAP_S:
             return []
         self.planner, self.trail, self.run = FloorPlanner(), Trail(), RunSeries(now_s)
+        self.has_run_map = False
         return [self.trail.snapshot(), self.run.snapshot()]
 
     def on_map(self, occupancy: OccupancyData, now_s: float) -> list:
         messages = self.heard("map", now_s)
+        self.has_run_map = True
         self.floor_plan = floor_plan_message(self.planner.update(occupancy))
         return [*messages, self.floor_plan]
 

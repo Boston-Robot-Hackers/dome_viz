@@ -177,7 +177,9 @@
     if (state.follow && world.robot) { state.cx = world.robot.x; state.cy = world.robot.y; }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    document.getElementById("empty").hidden = Boolean(world.plan);
+    // Before the first map only the floor and walls are missing: the robot,
+    // trail and laser show from the first odometry (TF01.16).
+    document.getElementById("empty").hidden = Boolean(world.plan || world.robot);
     if (world.plan) {
       const plan = world.plan;
       const [left, top] = toScreen(plan.origin[0], plan.origin[1] + plan.height * plan.resolution_m);
@@ -188,7 +190,11 @@
       ctx.drawImage(raster, 0, 0, plan.width * size, plan.height * size);
       ctx.restore();
       ctx.globalAlpha = 1;
-      drawGrid(); drawWalls(); drawOrigin(); drawLaser(); drawTrail(); drawRobot();
+    }
+    if (world.plan || world.robot) {
+      drawGrid();
+      if (world.plan) drawWalls();
+      drawOrigin(); drawLaser(); drawTrail(); drawRobot();
     }
     drawScale();
     api.onDraw();
@@ -389,7 +395,11 @@
       raster = null;
       if (isFirst) fit();
     },
-    robot(message) { world.robot = message; },
+    robot(message) {
+      // With no map to frame yet, keep the robot in view until one arrives.
+      if (!world.plan && !world.robot) setFollow(true);
+      world.robot = message;
+    },
     trail(message) {
       world.trailMax = message.max_points;
       world.trail = message.is_full ? message.points : world.trail.concat(message.points);

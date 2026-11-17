@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # test_bridge_node — topic callbacks, TF-less pose, camera subscription life
 # Author: Pito Salas and Claude Code
-# Version: 5
+# Version: 6
 # Created: 2026-11-14
 # Updated: 2026-11-16
 # Open Source Under MIT license
@@ -200,6 +200,40 @@ def test_pose_is_pushed_once_tf_answers(node):
     robot = only(node.server, "robot")
     assert (robot["x"], robot["y"]) == (2.0, 1.0)
     assert robot["yaw"] == pytest.approx(0.0)
+
+
+def place_on_odom_only(node: BridgeNode, x_m: float, y_m: float):
+    """Odometry is up but SLAM is not: `odom -> base_footprint` and
+    `odom -> laser`, and no `map -> odom`. Returns their stamp."""
+    stamp = node.get_clock().now().to_msg()
+    for child in ("base_footprint", "laser"):
+        node.tf_buffer.set_transform(
+            a_transform("odom", child, x_m, y_m, stamp), "test"
+        )
+    return stamp
+
+
+def test_pose_uses_odom_as_map_before_any_map(node):
+    """TF01.16: the robot shows from the first odometry, before SLAM is up."""
+    place_on_odom_only(node, x_m=0.5, y_m=0.25)
+    node.push_pose()
+    robot = only(node.server, "robot")
+    assert (robot["x"], robot["y"]) == (0.5, 0.25)
+
+
+def test_laser_uses_odom_as_map_before_any_map(node):
+    stamp = place_on_odom_only(node, x_m=0.5, y_m=0.25)
+    node.take_scan(a_scan(stamp))
+    assert only(node.server, "laser")["origin"] == [0.5, 0.25]
+
+
+def test_a_missing_map_to_odom_hides_the_robot_once_a_map_has_arrived(node):
+    """After a map, no `map -> odom` means SLAM has died: draw nothing rather
+    than a robot in the wrong place."""
+    node.take_map(a_map())
+    place_on_odom_only(node, x_m=0.5, y_m=0.25)
+    node.push_pose()
+    assert "robot" not in types_in(node.server)
 
 
 def a_scan(stamp=None) -> LaserScan:

@@ -2,21 +2,24 @@
 
 ## Open
 
-### Pick up here (2026-11-16, later)
+### Pick up here (2026-11-16, evening)
 
-- **F01 page tweaks done and approved**: lighter steel-blue walls (TF01.13),
-  wall cells drawn as grey squares (TF01.14), a Key panel (TF01.15). Chores:
-  laser scans no longer dropped, class colours defined, `make view` /
-  `make replay` guard against the wrong clock.
-- **F02 approved and built**: Square up passed every replay check but one.
-- **Next: the live session** (TF01.12), which needs you and the robot.
+- **TF01.16 built and committed**: the robot, trail, laser and object
+  markers show from the first odometry, before any map. **Its by-eye check
+  is still to run**: a replay that starts before SLAM (task file lists what
+  to confirm).
+- **Decided**: a finished replay freezes at its last moment; objects stay
+  "in view" (`notes.md`).
+- **Next after that: the live session** (TF01.12), which needs you and the
+  robot.
 
 ### Next
 
-- **F01**: only TF01.12 left, the live demo plus Pi CPU measurements.
+- **F01**: then only TF01.12 left, the live demo plus Pi CPU measurements.
 - **F02**: closes after its one deferred check, at the live session.
-- **Warn once when transforms are rejected as stale** (I02's first fix):
-  the wrong clock has silently hidden the robot twice today.
+- **TF01.16**: run its by-eye check, then it is done.
+- **Warn once when transforms are rejected as stale** (I02's first fix,
+  `chores.md`): the wrong clock hid the robot three times today.
 
 ### Open issues
 

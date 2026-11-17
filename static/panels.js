@@ -78,8 +78,11 @@
     for (const [id, element] of markerEls) {
       if (!live.has(id)) { element.remove(); markerEls.delete(id); }
     }
-    markersEl.hidden = !world.plan;
-    if (!world.plan) return;
+    // Markers show whenever the map canvas does, which before the first map
+    // is from the first odometry, with odom standing in for map (TF01.16).
+    const isShown = Boolean(world.plan || world.robot);
+    markersEl.hidden = !isShown;
+    if (!isShown) return;
     // Draw the important ones first so that where chips collide, the loser is
     // the less interesting object: selected, then in view, then most seen.
     const rank = (target) =>

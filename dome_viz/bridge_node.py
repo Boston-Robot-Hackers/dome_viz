@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # bridge_node — ROS adapter that feeds the dome_viz web page
 # Author: Pito Salas and Claude Code
-# Version: 5
+# Version: 6
 # Created: 2026-11-14
 # Updated: 2026-11-16
 # Open Source Under MIT license
@@ -20,6 +20,10 @@ thread the moment a page opens.
   `map -> odom` to place it. A lookup that fails, **or that answers only with
   a transform older than TF_STALE_S**, is skipped rather than guessed at — see
   `lookup`.
+- **Until this run's first map, `odom` stands in for `map`**, so the robot,
+  trail and laser show from the first odometry rather than once SLAM is up.
+  After a map has arrived a missing `map -> odom` hides the robot again; see
+  `lookup_in_map`.
 - **A scan waits for its transform.** `/scan` is stamped ~45 ms ahead of
   the newest `map -> laser` transform, so looking it up at its own stamp at
   once almost always extrapolates. The newest scan is held in `pending_scan`
@@ -254,6 +258,25 @@ class BridgeNode(Node):
             return None
         return pose2d_of(transform.transform)
 
+    def lookup_in_map(self, child: str, when: Time) -> Pose2D | None:
+        """`child`'s pose in `map`, with `odom` standing in until a map exists.
+
+        Before SLAM is up nothing places `odom` in `map`, and the robot starts
+        at the map's origin anyway, so the two are taken to coincide. Once this
+        run has a map the stand-in stops: a missing `map -> odom` then means
+        SLAM has died, and the robot must not be drawn in the wrong place.
+        """
+        pose = self.lookup(MAP_FRAME, child, when)
+        if pose is not None:
+            return pose
+        with self.lock:
+            has_map = self.view.has_run_map
+        if has_map:
+            return None
+        if child == ODOM_FRAME:
+            return Pose2D(0.0, 0.0, 0.0)
+        return self.lookup(ODOM_FRAME, child, when)
+
     def take_map(self, grid: OccupancyGrid) -> None:
         self.feed(self.view.on_map, occupancy_of(grid))
 
@@ -276,8 +299,8 @@ class BridgeNode(Node):
         scan = self.pending_scan
         if scan is None:
             return
-        lidar_in_map = self.lookup(
-            MAP_FRAME, scan.header.frame_id, Time.from_msg(scan.header.stamp)
+        lidar_in_map = self.lookup_in_map(
+            scan.header.frame_id, Time.from_msg(scan.header.stamp)
         )
         if lidar_in_map is None:
             return
@@ -293,7 +316,7 @@ class BridgeNode(Node):
         self.resolve_scan()
         latest = Time()
         robot_in_odom = self.lookup(ODOM_FRAME, ROBOT_FRAME, latest)
-        map_from_odom = self.lookup(MAP_FRAME, ODOM_FRAME, latest)
+        map_from_odom = self.lookup_in_map(ODOM_FRAME, latest)
         if robot_in_odom is None or map_from_odom is None:
             return
         self.feed(self.view.on_pose, robot_in_odom, map_from_odom)

@@ -16,7 +16,7 @@ drawing.
 
 ## Order of work
 
-TF01.13–TF01.15 were added after TF01.12 but **run before it**, so the demo
+TF01.13–TF01.16 were added after TF01.12 but **run before it**, so the demo
 shows the finished page. The numbers follow the order the steps were added.
 
 ## TF01.0 — Decide the web stack
@@ -685,3 +685,49 @@ The entries:
 - explored and unexplored floor.
 
 *Test*: manual; each entry checked against the map, in both themes.
+
+## TF01.16 — Show the robot before the map arrives
+
+**Status**: in progress.
+
+**Description**: The user asked for the page to start showing things as
+soon as odometry first arrives. Until now the page waited for the first
+`/map`, and the robot waited for `map -> odom`, so nothing showed until SLAM
+was running.
+
+- **Bridge**: until this run's first map, `odom` stands in for `map`.
+  - A missing `map -> odom` is taken as identity.
+  - The laser falls back to `odom -> laser`.
+  - **Once a map has arrived, the fallback stops**, so a dead SLAM still
+    hides the robot rather than drawing it in the wrong place.
+- **`ViewState`** tracks `has_run_map`, reset at each run start.
+- **Page**:
+  - The grid, origin, laser, trail and robot are drawn without a map; only
+    the floor and walls wait for it.
+  - The overlay now reads "Waiting for topic robot ODOM" (the user's
+    wording) and goes once the robot is shown. The status line still says
+    "Waiting for the map · robot connected" until the map arrives.
+  - With no map, the first robot pose turns Follow on. The first map frames
+    the view once, as before.
+  - **Object markers show without a map too.** They had been gated on
+    `world.plan` alone (`panels.js` `placeMarkers`), so before the first
+    map an object listed "in view" had no marker. The gate is now
+    `world.plan || world.robot`, the same one the canvas uses.
+- **When SLAM starts**, the trail jumps once to its corrected place; it is
+  kept in `odom` and resent when `map -> odom` moves.
+
+*Test*:
+
+- `test_pose_uses_odom_as_map_before_any_map`
+- `test_laser_uses_odom_as_map_before_any_map`
+- `test_a_missing_map_to_odom_hides_the_robot_once_a_map_has_arrived`
+- `test_a_new_run_waits_for_its_own_map`
+
+The page is checked by eye on a replay where the bag starts before SLAM.
+
+There is no JS test harness, so the page changes have no automated test.
+The by-eye check must confirm:
+
+- the robot, trail, laser and origin show before the first map;
+- **object markers show before the first map**, one for each object in the
+  list.

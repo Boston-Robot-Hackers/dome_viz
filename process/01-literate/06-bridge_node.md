@@ -1,6 +1,6 @@
 ---
-version: "1.1"
-generated: "2026-11-15"
+version: "1.2"
+generated: "2026-11-16"
 ---
 
 # bridge_node: the only place ROS and the page meet
@@ -93,6 +93,27 @@ except TransformException as error:
 ```
 
 This is the one place where "return `None` on a problem" is the right answer rather than a style violation: TF not yet having a transform is a **normal startup and replay condition**, not an error, and the alternative — inventing a pose — would draw the robot somewhere it has never been.
+
+### Before the first map, odom stands in for map
+
+Until SLAM is up, nothing publishes `map → odom`, so the second lookup above has no answer and the robot would stay hidden. Instead, **until this run's first map, `odom` is taken to coincide with `map`**:
+
+```python
+pose = self.lookup(MAP_FRAME, child, when)
+if pose is not None:
+    return pose
+with self.lock:
+    has_map = self.view.has_run_map
+if has_map:
+    return None
+if child == ODOM_FRAME:
+    return Pose2D(0.0, 0.0, 0.0)
+return self.lookup(ODOM_FRAME, child, when)
+```
+
+This is a **reasoned assumption, not a guess**: the robot starts at the map's origin anyway, so the two frames coincide when SLAM starts. Once a map has arrived the stand-in switches off. After that, a missing `map → odom` means SLAM has died, and the robot must vanish rather than be drawn in the wrong place.
+
+When SLAM does start, the trail jumps once to its corrected place. Because the trail is kept in `odom`, that jump is just the first real `map → odom` arriving.
 
 ### The absent answer that isn't an exception
 

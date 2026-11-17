@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # test_view_state — labels, lost targets, status, run start, laser, floor plan
 # Author: Pito Salas and Claude Code
-# Version: 4
+# Version: 5
 # Created: 2026-11-14
 # Updated: 2026-11-16
 # Open Source Under MIT license
@@ -116,6 +116,16 @@ def test_status_waits_for_map_then_goes_live():
     assert status["state"] == "live"
     assert status["ages_s"]["odom"] == 2.0
     assert status["run_s"] == 2.0
+
+
+def test_a_new_run_waits_for_its_own_map():
+    """The bridge's odom-for-map stand-in applies again after a quiet gap."""
+    state = ViewState(PROFILES)
+    assert not state.has_run_map
+    state.on_map(OccupancyData(2, 2, 0.05, (0.0, 0.0), [0, 0, 0, 0]), 0.0)
+    assert state.has_run_map
+    state.on_speed(0.0, RUN_GAP_S + 1.0)
+    assert not state.has_run_map
 
 
 def test_status_not_connected_when_all_quiet():

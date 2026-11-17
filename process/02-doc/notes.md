@@ -97,6 +97,10 @@ publishes `/clock`, so a node on sim time has a frozen clock; without
 stamps, every transform looks days old, and `bridge_node` rejects them all as
 stale and draws no robot (see issue I02).
 
+**A finished replay freezes at its last moment, by decision** (2026-11-16).
+When the bag ends `/clock` stops, so nothing ages: objects stay "in view",
+the run ticker stops. Not a bug; do not add a wall-time fallback.
+
 **Never replay two bags at once**, and restart the viewer between replays:
 `/clock` then jumps backwards, which makes source ages negative (I02).
 

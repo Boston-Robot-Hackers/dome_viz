@@ -1,6 +1,6 @@
 ---
-version: "1.1"
-generated: "2026-11-15"
+version: "1.2"
+generated: "2026-11-16"
 ---
 
 # view_state: everything the page shows, as JSON messages
@@ -41,6 +41,8 @@ return [self.trail.snapshot(), self.run.snapshot()]
 ```
 
 The first robot message ever, or the first after **every** source has been silent for over 30 s, starts a run. It returns empty full messages so every page clears its trail and graphs.
+
+A new run also clears **`has_run_map`**, which `on_map` sets. The bridge reads it to decide whether `odom` may still stand in for `map`, so each run waits for its own first map before the stand-in stops.
 
 Why this rule:
 
