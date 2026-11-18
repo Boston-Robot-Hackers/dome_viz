@@ -575,7 +575,7 @@ the Pi's `$DOME_PROFILE`:
 ```
 bl dome2 robot.launch.py --options "d c vi"
 bl dome_nav robot_map.launch.py --map_name <name>
-bl dome_semantic semantic.launch.py --map_name <name>
+bl dome_semantic robot.launch.py --map_name <name>
 ```
 
 - **Vision is needed** for the camera panel and for the detections the
