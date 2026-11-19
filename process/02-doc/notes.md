@@ -19,8 +19,8 @@ nothing.
 
 **Decided 2026-11-15 (user's correction).** Every DOME package launches
 through **`better_launch`**, not ROS 2's own launch system — `bl dome_viz
-view.launch.py`, matching `bl dome2 robot.launch.py` and the rest. The first
-version of `view.launch.py` used `LaunchDescription` and
+remote.launch.py`, matching `bl dome2 robot.launch.py` and the rest. The first
+version of the launch file (then `view.launch.py`) used `LaunchDescription` and
 `DeclareLaunchArgument`; it was rewritten.
 
 **`better_launch` is never to be modified** (user, 2026-11-15). It is a
@@ -55,7 +55,7 @@ On the command line the arguments are `--port 8094`, not `port:=8094`.
 
 **A launchfile cannot be imported, so it cannot be unit tested.**
 `@launch_this` runs the decorated function at *decoration* time, so importing
-`view.launch.py` starts the node. Keep anything worth testing in the package
+`remote.launch.py` starts the node. Keep anything worth testing in the package
 — `dome_viz/page_urls.py` exists for exactly that — and let the launchfile
 stay thin. `test_launch.py` checks the arguments by parsing the file with
 `ast`.
@@ -85,7 +85,7 @@ disabled when it was recorded.
 **To replay it** into the viewer, from the VM:
 
 ```
-bl dome_viz view.launch.py --sim_time True
+bl dome_viz remote.launch.py --sim_time True
 ros2 bag play ~/.dome/bags/viz01 --clock
 ```
 
@@ -193,7 +193,7 @@ argument, so the node runs through `ros2 run`. Use a fresh `map_name` each
 time, or `~/.dome/semantic_maps/<name>.json` is restored at startup.
 
 ```
-bl dome_viz view.launch.py --sim_time True
+bl dome_viz remote.launch.py --sim_time True
 ros2 run dome_semantic semantic_map_node --ros-args -r __node:=semantic_map \
   -p use_sim_time:=true -p map_name:=<fresh_name> \
   -p class_profile_path:=$(ros2 pkg prefix dome_semantic)/share/dome_semantic/config/class_profiles.yaml \
@@ -210,7 +210,7 @@ TF01.7's eight steps all passed on 2026-11-15 (`history.md`). Re-run them after
 anything that changes what is drawn, such as F02.
 
 ```
-bl dome_viz view.launch.py --sim_time True
+bl dome_viz remote.launch.py --sim_time True
 ros2 bag play ~/.dome/bags/viz01 --clock
 ```
 
@@ -231,7 +231,7 @@ Launch without `--sim_time`, which must be off here, or the node's clock
 freezes with no `/clock` publisher:
 
 ```
-bl dome_viz view.launch.py
+bl dome_viz remote.launch.py
 ```
 
 **The robot's own stack has to be up first.** With nothing running on the Pi

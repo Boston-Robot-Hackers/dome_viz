@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
-# view.launch.py — start the bridge and print the page's URLs
+# remote.launch.py — dome_viz's bridge and web page, on the remote computer
 # Author: Pito Salas and Claude Code
-# Version: 2
+# Version: 3
 # Created: 2026-11-15
-# Updated: 2026-11-15
+# Updated: 2026-11-19
 # Open Source Under MIT license
+#
+# Usage:
+#   bl dome_viz remote.launch.py                   # live robot, wall time
+#   bl dome_viz remote.launch.py --sim_time True   # bag replay (make replay)
+#   bl dome2 remote.launch.py --options "v"        # via dome2's "viz" subsystem
 """Starts `bridge_node` and logs the addresses the page can be opened at.
 
 A `better_launch` launchfile, like the rest of the DOME packages: run it with
-`bl dome_viz view.launch.py`, or `make view`.
+`bl dome_viz remote.launch.py`, or `make view`.
 
 **For bag replay add `--sim_time True`.** The argument is deliberately *not*
 called `use_sim_time`: that name collides with `better_launch`'s own
@@ -28,7 +33,7 @@ from dome_viz.page_urls import page_urls
 
 
 @launch_this
-def view(sim_time: bool = False, host: str = "0.0.0.0", port: int = 8080):
+def remote_launch(sim_time: bool = False, host: str = "0.0.0.0", port: int = 8080):
     """Serve the live map view.
 
     Parameters

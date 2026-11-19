@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-# test_launch — the view launchfile's arguments, and the URLs it prints
+# test_launch — the remote launchfile's arguments, and the URLs it prints
 # Author: Pito Salas and Claude Code
-# Version: 2
+# Version: 3
 # Created: 2026-11-15
-# Updated: 2026-11-15
+# Updated: 2026-11-19
 # Open Source Under MIT license
 """Reads the launchfile as source, and tests the URL helper for real.
 
 **The launchfile cannot be imported.** `better_launch`'s `@launch_this` runs
-the decorated function at decoration time, so importing `view.launch.py`
+the decorated function at decoration time, so importing `remote.launch.py`
 would start the bridge. The launch arguments are therefore checked by parsing
 the file with `ast`, which is enough to catch the thing that breaks silently:
 an argument renamed, removed, or given a different default.
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from dome_viz.page_urls import lan_address, page_urls
 
-LAUNCH_FILE = Path(__file__).resolve().parent.parent / "launch" / "view.launch.py"
+LAUNCH_FILE = Path(__file__).resolve().parent.parent / "launch" / "remote.launch.py"
 
 
 def launch_function() -> ast.FunctionDef:

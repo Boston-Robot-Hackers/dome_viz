@@ -1,27 +1,46 @@
 ---
-version: "1.0"
-generated: "2026-11-15"
+version: "1.1"
+generated: "2026-11-19"
 ---
 
 # Appendix: the launchfile, and why it is nearly empty
 
-Two small files start the viewer: `launch/view.launch.py` and
+Two small files start the viewer: `launch/remote.launch.py` and
 `dome_viz/page_urls.py`. The split between them is the only interesting thing
 about either, and it is forced by how `better_launch` works.
 
 ## A launchfile is a function
 
 Every DOME package launches through **`better_launch`** rather than ROS 2's own
-launch system, so `view.launch.py` is a decorated function whose *typed
+launch system, so `remote.launch.py` is a decorated function whose *typed
 parameters are the launch arguments*:
 
 ```python
 @launch_this
-def view(use_sim_time: bool = False, host: str = "0.0.0.0", port: int = 8080):
+def remote_launch(sim_time: bool = False, host: str = "0.0.0.0", port: int = 8080):
     bl = BetterLaunch()
     bl.node("dome_viz", "bridge_node", "dome_viz_bridge",
-            params={"host": host, "port": port}, use_sim_time=use_sim_time)
+            params={"host": host, "port": port, "use_sim_time": sim_time})
 ```
+
+### Why the name `remote.launch.py`
+
+The stack-wide convention (`dome2/stack/launch_conventions.md`, F05) allows a
+package exactly two launch file names: **`robot.launch.py`** for what runs on
+the robot and **`remote.launch.py`** for what runs on the remote computer. The
+viewer runs on the VM, so it is `remote`. It was called `view.launch.py` until
+2026-11-19.
+
+The entry function is named after the file, `remote_launch`, and dome2's
+`remote.launch.py` reaches it as its `viz` subsystem.
+
+### Why `sim_time`, not `use_sim_time`
+
+The argument **cannot** be called `use_sim_time`. That collides with
+better_launch's own `--use-sim-time` switch, and the declared argument is then
+silently never populated: TF lookups go stale and the robot is never drawn,
+with nothing in the log. So the file declares `sim_time` and passes it to the
+node as the `use_sim_time` *parameter*.
 
 Compare this with the ROS 2 equivalent it replaced: a `LaunchDescription`
 holding a list of `DeclareLaunchArgument` objects, a `Node` whose parameters
@@ -31,7 +50,7 @@ not a number until launch time. **Here `port` is simply an `int`**, so the
 URLs are an f-string.
 
 The docstring is not decoration either: `better_launch` parses its
-`Parameters` section into the help text for `bl dome_viz view.launch.py -h`.
+`Parameters` section into the help text for `bl dome_viz remote.launch.py -h`.
 
 ## The catch: it runs at import
 
@@ -86,7 +105,7 @@ a real case — it is what you get on a laptop with the wifi off.
   `192.0.2.1` would read better but relies on a default route existing.
 - **The `ast` tests are a workaround, not a win.** They cannot check that the
   node actually receives the parameters, only that the source says so. The
-  end-to-end check is that `bl dome_viz view.launch.py --port N` really
+  end-to-end check is that `bl dome_viz remote.launch.py --port N` really
   serves on N, which was done by hand.
 - **`make replay` backgrounds the launcher and kills it with `kill %1`**,
   which is fine interactively and poor in a script. If it ever needs to be
